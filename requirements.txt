@@ -1,0 +1,13 @@
+h5py
+rdflib
+torch>=2.0.0
+torchvision
+torch_geometric
+matplotlib
+scipy
+tensorboard
+pycocotools
+LTNtorch
+neptune
+neptune-pytorch
+torchmetrics
