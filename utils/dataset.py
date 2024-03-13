@@ -739,7 +739,7 @@ def stats_vg(ann_bbox_file: str, ann_rel_file:str, set_choice:str):
 def add_vg2tg(bbox_offset:int, src_bbox_file: str, src_rel_file:str, set_choice:str,
               dst_train_file:str, dst_rel_file:str,  valtest_set:bool=False,
               dst_val_file:Optional[str]=None, dst_test_file:Optional[str]=None,
-              offset_id_img:bool=0,v2:bool=False) -> (int,Set[str], int):
+              offset_id_img:bool=0,v2:bool=False) -> Tuple[int,Set[str], int]:
     """extends  traffic genome with compatible visual genome images
 
     Args:
@@ -962,7 +962,7 @@ def add_vg2tg(bbox_offset:int, src_bbox_file: str, src_rel_file:str, set_choice:
         assert len(rel_bbox)!=0, 'each bounding box must have a relationship'
         assert len(data_bbox[img_id])!=0, 'each image must have at least one bounding box'
         
-        # FIXME add relationship  category
+        # add relationship  category
         for bbox in data_bbox[img_id]['bbox']:
             bbox['image_id'] = n_img
             
