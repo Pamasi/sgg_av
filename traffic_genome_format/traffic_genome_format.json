@@ -1,5 +1,6 @@
 {"predicate_to_idx":
-    {
+    {   
+        "__background__": 0,
         "belonging to": 1, 
         "at": 2, "in/on": 3, "to": 4, "has": 5, "covered in": 6, 
         "along": 7, "with": 8, "part of": 9, "against": 10, 
@@ -41,8 +42,8 @@
     }, 
 
 
-
- "label_to_idx": {
+"label_to_idx": {
+    "__background__": 0,
     "unlabeled": 1, "ego vehicle": 2, "rectification border": 3,
     "out of roi": 4, "static": 5, "dynamic": 6, "ground": 7,
     "road": 8, "sidewalk": 9, "parking": 10, "rail track": 11,
@@ -55,7 +56,7 @@
     "bicycle": 34, "license plate": 35
 }, 
 
- "idx_to_label": { "1": "unlabeled", "2": "ego vehicle", "3": "rectification border", "4": "out of roi", "5": "static", "6": "dynamic", "7": "ground", "8": "road", "9": "sidewalk", "10": "parking", "11": "rail track", "12": "building", "13": "wall", "14": "fence", "15": "guard rail", "16": "bridge", "17": "tunnel", "18": "pole", "19": "polegroup", "20": "traffic light", "21": "traffic sign", "22": "vegetation", "23": "terrain", "24": "sky", "25": "person", "26": "rider", "27": "car", "28": "truck", "29": "bus", "30": "caravan", "31": "trailer", "32": "train", "33": "motorcycle", "34": "bicycle", "35": "license plate"}, 
+ "idx_to_label": { "0": "__background__","1": "unlabeled", "2": "ego vehicle", "3": "rectification border", "4": "out of roi", "5": "static", "6": "dynamic", "7": "ground", "8": "road", "9": "sidewalk", "10": "parking", "11": "rail track", "12": "building", "13": "wall", "14": "fence", "15": "guard rail", "16": "bridge", "17": "tunnel", "18": "pole", "19": "polegroup", "20": "traffic light", "21": "traffic sign", "22": "vegetation", "23": "terrain", "24": "sky", "25": "person", "26": "rider", "27": "car", "28": "truck", "29": "bus", "30": "caravan", "31": "trailer", "32": "train", "33": "motorcycle", "34": "bicycle", "35": "license plate"}, 
  "object_count": {"unlabeled": 0, "ego vehicle": 0, "rectification border": 0, "out of roi": 0, "static": 0, "dynamic": 160, "ground": 134, "road": 967, "sidewalk": 928, "parking": 59, "rail track": 13, "building": 980, "wall": 362, "fence": 431, "guard rail": 2, "bridge": 29, "tunnel": 1, "pole": 985, "polegroup": 0, "traffic light": 495, "traffic sign": 927, "vegetation": 948, "terrain": 487, "sky": 830, "person": 6820, "rider": 680, "car": 6976, "truck": 154, "bus": 138, "caravan": 0, "trailer": 0, "train": 62, "motorcycle": 245, "bicycle": 1334, "license plate": 0}, 
  "idx_to_attribute": {"1": "Forward", "2": "Backward", "3": "Leftward", "4": "Rightward"}, 
  "attribute_to_idx": {"Forward": 1, "Backward": 2, "Leftward": 3, "Rightward": 4}, "attribute_count": {"Forward": 19715, "Backward": 2663, "Leftward": 1597, "Rightward": 1172}

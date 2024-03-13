@@ -83,15 +83,19 @@ Python 3.10+
    ```sh
    git clone https://github.com/Pamasi/sgg_av.git
    ```
-2. Generate Traffic Genome dataset
-    ```bash 
-    . generate_tg.sh <visual-genome-folder>  <visual-genome-images-folder>  
-    ```
 2. Create an Anaconda environment
     ```bash
-    conda create -n sgg_av_env python=3.10.12 -r requirements.txt
+    conda create -n sgg_av_env python=3.10.12 
     conda activate sgg_av_env
+    python -m pip install -r requirements.txt
     ```
+3. Generate Traffic Genome dataset (folder coco_traffic_genome_v2) and its extension  with Visual Genome (folder coco_mix_dataset_v2)
+    ```bash 
+    . generate_tg.sh 
+    ```
+  
+
+
 #### WARNING
 Torchviz is not compatible with RelTR do not install it.
 ### Create RDF Knowledge graph from pandaset
