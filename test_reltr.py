@@ -20,7 +20,7 @@ import utils.misc as utils
 from coco import build_dataset, get_coco_api_from_dataset
 from engine import evaluate, train_one_epoch
 from models import build_model
-from utils.common import old_load_neptune_checkpoint, get_args_parser, roc_rel, cm_rel
+from utils.common import load_neptune_checkpoint, get_args_parser, roc_rel, cm_rel
 
 # DEBUG = True
 import pandas as pd
@@ -113,7 +113,8 @@ def main(args):
         runs_table_df = neptune.init_project().fetch_runs_table().to_pandas()
         
         run = runs_table_df[runs_table_df["sys/id"]==args.sys_id]
-        
+        print(runs_table_df["sys/id"])
+        print(args.sys_id)
         if  run.empty:
             raise ValueError('Invalid neptun run id')
 

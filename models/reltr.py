@@ -20,6 +20,7 @@ from .matcher import build_matcher
 from .transformer import build_transformer
 from .kge import build_kge
 from .fuzzy_logic import *
+import ltn_log
 
 from utils.dataset import MAP_PD2TG
 
@@ -338,136 +339,270 @@ class SetCriterion(nn.Module):
             self.enable_kg=False
         self.enable_ltn = enable_ltn
         self.rel_assign = None
+
         if enable_ltn:
             self.ec_enable = ec_enable
             self.rc_enable = rc_enable
             self.use_tgt_constr = tgt_as_constr
+            use_log = True
 
-            if different_p == None:
-                self.equal_p = True
-                self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
-                self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
-                
-                # for simplicity same forall for entity and relationship
-                self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
-            
-            else:
-                self.equal_p = False
-                self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
-                self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
-                self.forall_hard = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[1]), quantifier="f")
+            if not use_log:
+                if different_p == None:
+                    self.equal_p = True
+                    self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
+                    self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
 
-                self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[-1]), quantifier="f")
-                
-                self.rel_cls_easy = self._parse_type_constraint(rel_easy_axiom_path, device=device)
-                self.rel_cls_hard = self._parse_type_constraint(rel_hard_axiom_path,device=device)
-                
+                    # for simplicity same forall for entity and relationship
+                    self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
 
-            self.c_not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
-            self.and_luk = ltn.Connective(ltn.fuzzy_ops.AndLuk())
-         
-            self.ltn_strategy = ltn_strategy
-            
-            match rel_operator:
-                case 0:
-                    self.rel_operator =  ltn.Connective(ltn.fuzzy_ops.AndLuk() )
-                
-                case 1:
-                    self.rel_operator =  ltn.Connective(ltn.fuzzy_ops.ImpliesReichenbach())
-                    
-                case 2:
-                    self.rel_operator =  ltn.Connective(ltn.fuzzy_ops.ImpliesGodel())
-                    
-                case _:
-                    raise ValueError(f'rel_operator {rel_operator} is invalid')
-            
-  
-            match self.ltn_strategy:
-                case 0:
-                    # just use the embeeding class output of the network
-                    self.p_sub_is_a = ltn.Predicate(model=PredFromEmbedding() )
-                   
-                    
-                    self.p_obj_is_a = ltn.Predicate(model=PredFromEmbedding() )
-                    self.p_sub_in_set = ltn.Predicate(model=EntInSet() )
-                    self.p_obj_in_set = ltn.Predicate(model=EntInSet())
-                    
-                    gr_last_dim = self.num_classes*2 + 7 + (self.num_rel_classes + 1)
-                        
-                case 1:
-                    self.ground_entity = GroundVanilla( layer_sizes=(self.num_classes+4 +1, 64, self.num_classes)  )
-                    
-                    self.p_sub_is_a = ltn.Predicate(model=GroundPred(self.ground_entity) )
-                    self.p_obj_is_a = ltn.Predicate(model=GroundPred(self.ground_entity) )
-                    gr_last_dim = (self.num_classes +4+1 )*2 + 7 + (self.num_rel_classes + 1) 
-                case _:
-                    raise ValueError(f'ltn strategy {ltn_strategy} is invalid')
-
-            
-
-            if reltr_grounding==True:
-                if increase_dim_net==False:
-                    self.ground_relationship = GroundVanilla( layer_sizes=( gr_last_dim , 64, self.num_rel_classes), p_dropout = p_dropout)     
-               
-                    
                 else:
-                    self.ground_relationship = GroundVanilla( layer_sizes=( gr_last_dim , 64,128,  self.num_rel_classes), p_dropout= p_dropout )  
-            
-                self.use_regressor = True
-                self.p_rel_in_set = ltn.Predicate(model=RelInSetL(self.ground_relationship) )
-                self.p_rel_is_a = ltn.Predicate(model=RelIsAL(self.ground_relationship) )
+                    self.equal_p = False
+                    self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
+                    self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
+                    self.forall_hard = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[1]), quantifier="f")
+
+                    self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[-1]),
+                                                           quantifier="f")
+
+                    self.rel_cls_easy = self._parse_type_constraint(rel_easy_axiom_path, device=device)
+                    self.rel_cls_hard = self._parse_type_constraint(rel_hard_axiom_path, device=device)
+
+                self.c_not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
+                self.and_luk = ltn.Connective(ltn.fuzzy_ops.AndLuk())
+
+                self.ltn_strategy = ltn_strategy
+
+                match rel_operator:
+                    case 0:
+                        self.rel_operator = ltn.Connective(ltn.fuzzy_ops.AndLuk())
+
+                    case 1:
+                        self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesReichenbach())
+
+                    case 2:
+                        self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesGodel())
+
+                    case _:
+                        raise ValueError(f'rel_operator {rel_operator} is invalid')
+
+                match self.ltn_strategy:
+                    case 0:
+                        # just use the embeeding class output of the network
+                        self.p_sub_is_a = ltn.Predicate(model=PredFromEmbedding())
+
+                        self.p_obj_is_a = ltn.Predicate(model=PredFromEmbedding())
+                        self.p_sub_in_set = ltn.Predicate(model=EntInSet())
+                        self.p_obj_in_set = ltn.Predicate(model=EntInSet())
+
+                        gr_last_dim = self.num_classes * 2 + 7 + (self.num_rel_classes + 1)
+
+                    case 1:
+                        self.ground_entity = GroundVanilla(layer_sizes=(self.num_classes + 4 + 1, 64, self.num_classes))
+
+                        self.p_sub_is_a = ltn.Predicate(model=GroundPred(self.ground_entity))
+                        self.p_obj_is_a = ltn.Predicate(model=GroundPred(self.ground_entity))
+                        gr_last_dim = (self.num_classes + 4 + 1) * 2 + 7 + (self.num_rel_classes + 1)
+                    case _:
+                        raise ValueError(f'ltn strategy {ltn_strategy} is invalid')
+
+                if reltr_grounding == True:
+                    if increase_dim_net == False:
+                        self.ground_relationship = GroundVanilla(layer_sizes=(gr_last_dim, 64, self.num_rel_classes),
+                                                                 p_dropout=p_dropout)
+
+
+                    else:
+                        self.ground_relationship = GroundVanilla(
+                            layer_sizes=(gr_last_dim, 64, 128, self.num_rel_classes), p_dropout=p_dropout)
+
+                    self.use_regressor = True
+                    self.p_rel_in_set = ltn.Predicate(model=RelInSetL(self.ground_relationship))
+                    self.p_rel_is_a = ltn.Predicate(model=RelIsAL(self.ground_relationship))
+
+                else:
+                    self.ground_relationship = None
+                    self.use_regressor = False
+
+                    self.p_rel_in_set = ltn.Predicate(model=RelInSetL(use_logit=False))
+                    self.p_rel_is_a = ltn.Predicate(model=RelIsAL(use_logit=False))
 
             else:
-                self.ground_relationship = None
-                self.use_regressor = False
 
-                
-                self.p_rel_in_set = ltn.Predicate(model=RelInSetL(use_logit=False) )
-                self.p_rel_is_a = ltn.Predicate(model=RelIsAL(use_logit=False) )
+                if different_p == None:
+                    self.equal_p = True
+                    self.forall_neg = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                     semantics="forall")
+                    self.forall_pos = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                     semantics="forall")
 
-            self.sat_aggr = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            
-            # satisfiability for debugging purpose
-            self.sat_ent_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_rel_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_neg_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_pos_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            # float conversion is enough for fuzzification: account also for traffic label taxonomy
-            self.ot_e_label =  [  ltn.Constant(t.t().float()) for t  in torch.split(F.one_hot(torch.arange(0, self.num_classes), self.num_classes), 1) ]
-            # define constraint relationship here
-            # impl one-hot enconding for constraints
-            self.ot_r_label =  [   ltn.Constant(t.t().float()) for t  in torch.split(F.one_hot(torch.arange(0, self.num_rel_classes), self.num_rel_classes), 1)  ]
-            self.entity_fuzzy_th = entity_fuzzy_th
-       
-            self.all_label_type = {}
-            
-            self.not_op = ltn.Connective(ltn.fuzzy_ops.NotStandard())
-            
-            
-            
-            if use_snc==True:
-                print('USING Second Negative Constraints formulation ')
-                self.constr_neg_type = 0
-                self.neg_indices =  None
-                self.pos_indices = (1,2)
-                self.rel_neg_const_map  = self._parse_so4r_constraint(neg_constr_path)
+                    # for simplicity same forall for entity and relationship
+                    self.forall_ent_o_rel = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                           semantics="forall")
+
+                else:
+                    self.equal_p = False
+                    self.forall_neg = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                     semantics="forall")
+                    self.forall_pos = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                     semantics="forall")
+                    self.forall_hard = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                      semantics="forall")
+
+                    self.forall_ent_o_rel = ltn_log.log.Wrapper_Quantifier(ltn_log.log.fuzzy_ops.Aggreg_Mean(),
+                                                                           semantics="forall")
+
+                    self.rel_cls_easy = self._parse_type_constraint(rel_easy_axiom_path, device=device)
+                    self.rel_cls_hard = self._parse_type_constraint(rel_hard_axiom_path, device=device)
+
+                self.c_not = ltn_log.log.Wrapper_Connective(ltn_log.fuzzy_ops.Not_Std())
+                self.and_luk = ltn_log.log.Wrapper_Connective(ltn_log.log.fuzzy_ops.And_Sum())
+
+                self.ltn_strategy = ltn_strategy
+
+                match rel_operator:
+                    case 0:
+                        self.rel_operator = ltn_log.Wrapper_Connective(ltn_log.log.fuzzy_ops.And_Sum())
+
+                    case 1:
+                        self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesKleeneDienes())
+
+                    case 2:
+                        self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesGodel())
+
+                    case _:
+                        raise ValueError(f'rel_operator {rel_operator} is invalid')
+
+                match self.ltn_strategy:
+                    case 0:
+                        # just use the embeeding class output of the network
+                        self.p_sub_is_a = ltn_log.log.core.Predicate(model=PredFromEmbedding())
+
+                        self.p_obj_is_a = ltn_log.log.core.Predicate(model=PredFromEmbedding())
+                        self.p_sub_in_set = ltn_log.log.core.Predicate(model=EntInSet())
+                        self.p_obj_in_set = ltn_log.log.core.Predicate(model=EntInSet())
+
+                        gr_last_dim = self.num_classes * 2 + 7 + (self.num_rel_classes + 1)
+
+                    case 1:
+                        self.ground_entity = GroundVanilla(layer_sizes=(self.num_classes + 4 + 1, 64, self.num_classes))
+
+                        self.p_sub_is_a = ltn_log.log.core.Predicate(model=GroundPred(self.ground_entity))
+                        self.p_obj_is_a = ltn_log.log.core.Predicate(model=GroundPred(self.ground_entity))
+                        gr_last_dim = (self.num_classes + 4 + 1) * 2 + 7 + (self.num_rel_classes + 1)
+                    case _:
+                        raise ValueError(f'ltn strategy {ltn_strategy} is invalid')
+
+                if reltr_grounding == True:
+                    if increase_dim_net == False:
+                        self.ground_relationship = GroundVanilla(layer_sizes=(gr_last_dim, 64, self.num_rel_classes),
+                                                                 p_dropout=p_dropout)
+
+
+                    else:
+                        self.ground_relationship = GroundVanilla(
+                            layer_sizes=(gr_last_dim, 64, 128, self.num_rel_classes), p_dropout=p_dropout)
+
+                    self.use_regressor = True
+                    self.p_rel_in_set = ltn_log.log.core.Predicate(model=RelInSetL(self.ground_relationship))
+                    self.p_rel_is_a = ltn_log.log.core.Predicate(model=RelIsAL(self.ground_relationship))
+
+                else:
+                    self.ground_relationship = None
+                    self.use_regressor = False
+
+                    self.p_rel_in_set = ltn_log.log.core.Predicate(model=RelInSetL(use_logit=False))
+                    self.p_rel_is_a = ltn_log.log.core.Predicate(model=RelIsAL(use_logit=False))
+
+            if not use_log:
+                # and_ = ltn_log.Wrapper_Connective(ltn_log.fuzzy_ops.And_Sum())
+                # or_ = ltn_log.Wrapper_Connective(ltn_log.fuzzy_ops.Or_LogSumExp(alpha=1))
+                # implies = None
+                # forall = ltn_log.Wrapper_Quantifier(ltn_log.fuzzy_ops.Aggreg_Mean(), semantics="forall")
+                # and_aggreg = ltn_log.Wrapper_Formula_Aggregator(ltn_log.fuzzy_ops.Aggreg_Mean())
+                # exists = ltn_log.Wrapper_Quantifier(ltn_log.fuzzy_ops.Aggreg_LogSumExp(alpha=1), semantics="exists")
+                # or_aggreg = ltn_log.Wrapper_Formula_Aggregator(ltn_log.fuzzy_ops.Aggreg_LogSumExp(alpha=1))
+
+                self.sat_aggr = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+
+                # satisfiability for debugging purpose
+                self.sat_ent_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+                self.sat_rel_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+                self.sat_neg_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+                self.sat_pos_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+                # float conversion is enough for fuzzification: account also for traffic label taxonomy
+                self.ot_e_label = [ltn.Constant(t.t().float()) for t in
+                                   torch.split(F.one_hot(torch.arange(0, self.num_classes), self.num_classes), 1)]
+                # define constraint relationship here
+                # impl one-hot enconding for constraints
+                self.ot_r_label = [ltn.Constant(t.t().float()) for t in
+                                   torch.split(F.one_hot(torch.arange(0, self.num_rel_classes), self.num_rel_classes),
+                                               1)]
+                self.entity_fuzzy_th = entity_fuzzy_th
+
+                self.all_label_type = {}
+
+                self.not_op = ltn.Connective(ltn.fuzzy_ops.NotStandard())
+
+                if use_snc == True:
+                    print('USING Second Negative Constraints formulation ')
+                    self.constr_neg_type = 0
+                    self.neg_indices = None
+                    self.pos_indices = (1, 2)
+                    self.rel_neg_const_map = self._parse_so4r_constraint(neg_constr_path)
+
+                else:
+                    print('USING First Negative Constraints formulation ')
+                    self.constr_neg_type = 2
+                    self.neg_indices = (0, 1)
+                    self.pos_indices = (2, 3)
+
+                    self.rel_neg_const_map = self._parse_r4so_constraint(neg_constr_path, self.neg_indices)
+                    self.or_luk = ltn.Connective(ltn.fuzzy_ops.OrLuk())
 
             else:
-                print('USING First Negative Constraints formulation ')
-                self.constr_neg_type = 2
-                self.neg_indices = (0,1)
-                self.pos_indices = (2,3)
-                
-                self.rel_neg_const_map  = self._parse_r4so_constraint(neg_constr_path, self.neg_indices)
-                self.or_luk = ltn.Connective(ltn.fuzzy_ops.OrLuk())
 
-                
-                
+                self.sat_aggr = ltn_log.log.core.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_Sum())
+
+                # satisfiability for debugging purpose
+                self.sat_ent_axiom = ltn_log.log.core.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_Sum())
+                self.sat_rel_axiom = ltn_log.log.core.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_Sum())
+                self.sat_neg_axiom = ltn_log.log.core.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_Sum())
+                self.sat_pos_axiom = ltn_log.log.core.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_Sum())
+                # float conversion is enough for fuzzification: account also for traffic label taxonomy
+                self.ot_e_label = [ltn.Constant(t.t().float()) for t in
+                                   torch.split(F.one_hot(torch.arange(0, self.num_classes), self.num_classes), 1)]
+                # define constraint relationship here
+                # impl one-hot enconding for constraints
+                self.ot_r_label = [ltn.Constant(t.t().float()) for t in
+                                   torch.split(F.one_hot(torch.arange(0, self.num_rel_classes), self.num_rel_classes),
+                                               1)]
+                self.entity_fuzzy_th = entity_fuzzy_th
+
+                self.all_label_type = {}
+
+                self.not_op = ltn_log.Wrapper_Connective(ltn_log.fuzzy_ops.Not_Std())
+
+                if use_snc == True:
+                    print('USING Second Negative Constraints formulation ')
+                    self.constr_neg_type = 0
+                    self.neg_indices = None
+                    self.pos_indices = (1, 2)
+                    self.rel_neg_const_map = self._parse_so4r_constraint(neg_constr_path)
+
+                else:
+                    print('USING First Negative Constraints formulation ')
+                    self.constr_neg_type = 2
+                    self.neg_indices = (0, 1)
+                    self.pos_indices = (2, 3)
+
+                    self.rel_neg_const_map = self._parse_r4so_constraint(neg_constr_path, self.neg_indices)
+                    self.or_luk = ltn_log.Wrapper_Formula_Aggregator(ltn_log.log.fuzzy_ops.Aggreg_LogSumExp(alpha=1))
+
             self.rel_pos_const_map =  self._parse_r4so_constraint(pos_constr_path, self.pos_indices)
                 
 
-            self.sat_debug ={}
-            self.axiom_debug ={}
+            self.sat_debug ={'rel_axiom_sat' : -1.0, 'neg_axiom_sat' : -1.0, 'pos_axiom_sat' : -1.0, 'entity_axiom_sat' : -1.0}
+            self.axiom_debug ={'rel_axiom' : -1.0, 'neg_axiom' : -1.0, 'pos_axiom' : -1.0, 'neg_easy_axiom' : -1.0, 'pos_aeasy_xiom' : -1.0, 'neg_hard_axiom' : -1.0, 'pos_hard_axiom' : -1.0, 'entity_axiom' : -1.0}
             
             self._save_sat_debug = False
             
@@ -508,21 +643,21 @@ class SetCriterion(nn.Module):
         generate constraint  <if sub and obj, then not rel > given file where they are stored
         """
         constr = {}
-        
+
         with open(constr_path, 'r') as fp:
             for tr in list(map(lambda l: list(l.replace('\n', '').rsplit(',')), fp.readlines() )):
                 s, r, o = int(tr[0]), int(tr[1]), int(tr[2])
                 if (s,o) not in constr.keys():
                     constr[(s,o)] = []
-    
+
                 constr[(s,o)].append( self.ot_r_label[r].value.t())
-               
-            # only for compact version 
+
+            # only for compact version
             for k, v in constr.items():
                 constr[k]= torch.vstack(v)
-                
+
         self.all_label_type[0] = torch.vstack( [constr[k] for k in  constr.keys()] )
-        #sanity check 
+        #sanity check
         correct_shape = sum( [ v.size(0) for v in  constr.values()] )
         assert self.all_label_type[0].size(0) == correct_shape, f'wrong concatenation  for neg {self.all_label_type[0].size()} vs {correct_shape}'
     
@@ -570,11 +705,7 @@ class SetCriterion(nn.Module):
             for k, v in constr.items():
                 constr[k][0]= torch.vstack(v[0])
                 constr[k][1]= torch.vstack(v[1])
-                
-            
 
-   
-                
         self.all_label_type[indices[0]] = torch.vstack( [constr[k][0] for k in  constr.keys()] )
         #sanity check 
         correct_shape = sum( [ v[0].size(0) for v in  constr.values()] )
@@ -603,6 +734,7 @@ class SetCriterion(nn.Module):
             self.sat_ent_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
             self.sat_neg_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
             self.sat_pos_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+
         
         if self.equal_p==True and univ_p!=0:
             self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
@@ -767,7 +899,7 @@ class SetCriterion(nn.Module):
                     self.axiom_debug['pos_hard_axiom'] = -1.0    
                     
                 if self.rc_enable:
-                    self.axiom_debug['rel _axiom'] = -1.0
+                    self.axiom_debug['rel_axiom'] = -1.0
                 
                 if self.ec_enable:
                     self.axiom_debug['entity_axiom'] = -1.0
@@ -817,12 +949,16 @@ class SetCriterion(nn.Module):
                     
                     if self._save_sat_debug:
                         self.sat_debug['rel_axiom_sat'] = self.sat_rel_axiom(rel_axiom)
+                    else:
+                        self.sat_debug['rel_axiom_sat'] = -1.0
                 
                     self.axiom_debug['rel_axiom'] = rel_axiom.value.item()
                 
                 else:
                     has_rc  = False
                     if self._save_sat_debug:
+                        self.sat_debug['rel_axiom_sat'] = -1.0
+                    else:
                         self.sat_debug['rel_axiom_sat'] = -1.0
                 
                     self.axiom_debug['rel_axiom'] = -1.0                   
@@ -835,6 +971,8 @@ class SetCriterion(nn.Module):
                 
                 if self._save_sat_debug:
                     self.sat_debug['entity_axiom_sat'] = self.sat_ent_axiom(entity_axiom)
+                else:
+                    self.sat_debug['entity_axiom_sat'] = -1.0
                 
                 self.axiom_debug['entity_axiom'] = entity_axiom.value.item()
             
@@ -859,6 +997,8 @@ class SetCriterion(nn.Module):
                      
                         if self._save_sat_debug:
                             self.sat_debug['neg_axiom_sat'] = self.sat_neg_axiom(neg_axiom)
+                        else:
+                            self.sat_debug['neg_axiom_sat'] = -1.0
                         
                         self.axiom_debug['neg_axiom'] = neg_axiom.value.item()
                     else:
@@ -871,6 +1011,9 @@ class SetCriterion(nn.Module):
                                                     sub_valid_cls, obj_valid_cls, rel_valid_cls, forall_type=0)
                         if self._save_sat_debug:
                             self.sat_debug['neg_axiom_sat'] = self.sat_neg_axiom(neg_axiom)
+                        else:
+                            self.sat_debug['neg_axiom_sat'] = -1.0
+
                         
                         self.axiom_debug['neg_axiom'] = neg_axiom.value.item()
                 
@@ -909,7 +1052,9 @@ class SetCriterion(nn.Module):
                                 self.sat_debug['neg_axiom_sat'] = self.sat_neg_axiom(neg_hard_axiom)
                             
                             elif n_have_easy:
-                                self.sat_debug['neg_axiom_sat'] = self.sat_neg_axiom(neg_easy_axiom)   
+                                self.sat_debug['neg_axiom_sat'] = self.sat_neg_axiom(neg_easy_axiom)
+                            else:
+                                self.sat_debug['neg_axiom_sat'] = -1.0
                             
                                 
                             
@@ -934,6 +1079,8 @@ class SetCriterion(nn.Module):
                 
                     if self._save_sat_debug:
                         self.sat_debug['pos_axiom_sat'] = self.sat_pos_axiom(pos_axiom)
+                    else:
+                        self.sat_debug['pos_axiom_sat'] = -1.0
                         
                     self.axiom_debug['pos_axiom'] = pos_axiom.value.item()
                 else:
@@ -971,7 +1118,9 @@ class SetCriterion(nn.Module):
                             self.sat_debug['pos_axiom_sat'] = self.sat_neg_axiom(pos_hard_axiom)
                         
                         elif p_have_easy:
-                            self.sat_debug['pos_axiom_sat'] = self.sat_neg_axiom(pos_easy_axiom)   
+                            self.sat_debug['pos_axiom_sat'] = self.sat_neg_axiom(pos_easy_axiom)
+                        else:
+                            self.sat_debug['pos_axiom_sat'] = -1.0
                                             
                         
                     if p_have_easy:

@@ -45,99 +45,127 @@ def main(args):
     model.load_state_dict(checkpoint['model'], strict=True)
     model.eval()
 
+    for f in os.listdir(args.img_path):
+      if os.path.isfile(os.path.join(args.img_path, f)):
+        print(f)
+        img_path = os.path.join(args.img_path, f)
+        tmp = Path(img_path).stem
 
+        if args.enable_ltn:
+            postfix = '_ltn.jpg'
 
-    img_path = args.img_path
-    tmp = Path(img_path).stem
+        elif args.enable_kg:
+            postfix = '_kge.jpg'
 
-    if args.enable_ltn:
-        postfix = '_ltn.jpg' 
-        
-    elif args.enable_kg:
-        postfix = '_kge.jpg'   
-        
-    else:
-        postfix = '.jpg'
-        
-    inf_path= f'{args.inf_dir}/{os.path.basename(tmp)}_inf{postfix}'
-    
-    im = Image.open(img_path)
+        else:
+            postfix = '.jpg'
 
-    # mean-std normalize the input image (batch-size: 1)
-    img = transform(im).unsqueeze(0)
+        inf_path= f'{args.inf_dir}/{os.path.basename(tmp)}_inf{postfix}'
 
-    # propagate through the model
-    outputs = model(img)
+        im = Image.open(img_path)
 
-    # keep only predictions with 0.+ confidence
-    probas = outputs['rel_logits'].softmax(-1)[0, :, :-1]
-    probas_sub = outputs['sub_logits'].softmax(-1)[0, :, :-1]
-    probas_obj = outputs['obj_logits'].softmax(-1)[0, :, :-1]
-    keep = torch.logical_and(probas.max(-1).values > args.conf, torch.logical_and(probas_sub.max(-1).values >args.conf,
-                                                                            probas_obj.max(-1).values > args.conf))
+        # mean-std normalize the input image (batch-size: 1)
+        img = transform(im).unsqueeze(0)
 
-    # convert boxes from [0; 1] to image scales
-    sub_bboxes_scaled = rescale_bboxes(outputs['sub_boxes'][0, keep], im.size)
-    obj_bboxes_scaled = rescale_bboxes(outputs['obj_boxes'][0, keep], im.size)
-
-    topk = 30
-    keep_queries = torch.nonzero(keep, as_tuple=True)[0]
-    indices = torch.argsort(-probas[keep_queries].max(-1)[0] * probas_sub[keep_queries].max(-1)[0] * probas_obj[keep_queries].max(-1)[0])[:topk]
-    keep_queries = keep_queries[indices]
-
-    # use lists to store the outputs via up-values
-    conv_features, dec_attn_weights_sub, dec_attn_weights_obj = [], [], []
-
-    hooks = [
-        model.backbone[-2].register_forward_hook(
-            lambda self, input, output: conv_features.append(output)
-        ),
-        model.transformer.decoder.layers[-1].cross_attn_sub.register_forward_hook(
-            lambda self, input, output: dec_attn_weights_sub.append(output[1])
-        ),
-        model.transformer.decoder.layers[-1].cross_attn_obj.register_forward_hook(
-            lambda self, input, output: dec_attn_weights_obj.append(output[1])
-        )
-    ]
-    with torch.no_grad():
         # propagate through the model
         outputs = model(img)
 
-        for hook in hooks:
-            hook.remove()
+        # keep only predictions with 0.+ confidence
+        probas = outputs['rel_logits'].softmax(-1)[0, :, :-1]
+        probas_sub = outputs['sub_logits'].softmax(-1)[0, :, :-1]
+        probas_obj = outputs['obj_logits'].softmax(-1)[0, :, :-1]
+        keep = torch.Tensor([False])
+        i = 0
+        while not torch.any(keep) and args.conf-i >= 0:
+            keep = torch.logical_and(probas.max(-1).values > args.conf, torch.logical_and(probas_sub.max(-1).values >args.conf-i,
+                                                                                probas_obj.max(-1).values > args.conf-i))
+            i += 0.05
+        if args.conf-i <= 0:
+            continue
+        # convert boxes from [0; 1] to image scales
+        sub_bboxes_scaled = rescale_bboxes(outputs['sub_boxes'][0, keep], im.size)
+        obj_bboxes_scaled = rescale_bboxes(outputs['obj_boxes'][0, keep], im.size)
 
-        # don't need the list anymore
-        conv_features = conv_features[0]
-        dec_attn_weights_sub = dec_attn_weights_sub[0]
-        dec_attn_weights_obj = dec_attn_weights_obj[0]
+        topk = 30
+        keep_queries = torch.nonzero(keep, as_tuple=True)[0]
+        indices = torch.argsort(-probas[keep_queries].max(-1)[0] * probas_sub[keep_queries].max(-1)[0] * probas_obj[keep_queries].max(-1)[0])[:topk]
+        keep_queries = keep_queries[indices]
 
-        # get the feature map shape
-        h, w = conv_features['0'].tensors.shape[-2:]
-        im_w, im_h = im.size
+        # use lists to store the outputs via up-values
+        conv_features, dec_attn_weights_sub, dec_attn_weights_obj = [], [], []
 
-        fig, axs = plt.subplots(ncols=len(indices), nrows=3, figsize=(22, 7))
-        for idx, ax_i, (sxmin, symin, sxmax, symax), (oxmin, oymin, oxmax, oymax) in \
-                zip(keep_queries, axs.T, sub_bboxes_scaled[indices], obj_bboxes_scaled[indices]):
-            ax = ax_i[0]
-            ax.imshow(dec_attn_weights_sub[0, idx].view(h, w))
-            ax.axis('off')
-            ax.set_title(f'query id: {idx.item()}')
-            ax = ax_i[1]
-            ax.imshow(dec_attn_weights_obj[0, idx].view(h, w))
-            ax.axis('off')
-            ax = ax_i[2]
-            ax.imshow(im)
-            ax.add_patch(plt.Rectangle((sxmin, symin), sxmax - sxmin, symax - symin,
-                                       fill=False, color='blue', linewidth=2.5))
-            ax.add_patch(plt.Rectangle((oxmin, oymin), oxmax - oxmin, oymax - oymin,
-                                       fill=False, color='orange', linewidth=2.5))
+        hooks = [
+            model.backbone[-2].register_forward_hook(
+                lambda self, input, output: conv_features.append(output)
+            ),
+            model.transformer.decoder.layers[-1].cross_attn_sub.register_forward_hook(
+                lambda self, input, output: dec_attn_weights_sub.append(output[1])
+            ),
+            model.transformer.decoder.layers[-1].cross_attn_obj.register_forward_hook(
+                lambda self, input, output: dec_attn_weights_obj.append(output[1])
+            )
+        ]
+        with torch.no_grad():
+            # propagate through the model
+            outputs = model(img)
 
-            ax.axis('off')
-            ax.set_title(CLASSES[probas_sub[idx].argmax()]+' '+REL_CLASSES[probas[idx].argmax()]+' '+CLASSES[probas_obj[idx].argmax()], fontsize=10)
+            for hook in hooks:
+                hook.remove()
 
-        fig.tight_layout()
-        
-        plt.savefig(inf_path, dpi=300, bbox_inches='tight')
+            # don't need the list anymore
+            conv_features = conv_features[0]
+            dec_attn_weights_sub = dec_attn_weights_sub[0]
+            dec_attn_weights_obj = dec_attn_weights_obj[0]
+
+            # get the feature map shape
+            h, w = conv_features['0'].tensors.shape[-2:]
+            im_w, im_h = im.size
+
+            fig, axs = plt.subplots(ncols=len(indices), figsize=(22, 7))
+            if indices.shape[0] > 1:
+                for idx, ax_i, (sxmin, symin, sxmax, symax), (oxmin, oymin, oxmax, oymax) in \
+                        zip(keep_queries, axs.T, sub_bboxes_scaled[indices], obj_bboxes_scaled[indices]):
+                    ax = ax_i
+                    ax.imshow(dec_attn_weights_sub[0, idx].view(h, w))
+                    ax.axis('off')
+                    ax.set_title(f'query id: {idx.item()}')
+                    ax = ax_i
+                    ax.imshow(dec_attn_weights_obj[0, idx].view(h, w))
+                    ax.axis('off')
+                    ax = ax_i
+                    ax.imshow(im)
+                    ax.add_patch(plt.Rectangle((sxmin, symin), sxmax - sxmin, symax - symin,
+                                               fill=False, color='blue', linewidth=2.5))
+                    ax.add_patch(plt.Rectangle((oxmin, oymin), oxmax - oxmin, oymax - oymin,
+                                               fill=False, color='orange', linewidth=2.5))
+
+                    ax.axis('off')
+                    ax.set_title(CLASSES[probas_sub[idx].argmax()]+' '+REL_CLASSES[probas[idx].argmax()]+' '+CLASSES[probas_obj[idx].argmax()], fontsize=10)
+            else:
+                for idx, (sxmin, symin, sxmax, symax), (oxmin, oymin, oxmax, oymax) in \
+                        zip(keep_queries, sub_bboxes_scaled[indices], obj_bboxes_scaled[indices]):
+                    ax = axs
+                    ax.imshow(dec_attn_weights_sub[0, idx].view(h, w))
+                    ax.axis('off')
+                    ax.set_title(f'query id: {idx.item()}')
+                    ax = axs
+                    ax.imshow(dec_attn_weights_obj[0, idx].view(h, w))
+                    ax.axis('off')
+                    ax = axs
+                    ax.imshow(im)
+                    ax.add_patch(plt.Rectangle((sxmin, symin), sxmax - sxmin, symax - symin,
+                                               fill=False, color='blue', linewidth=2.5))
+                    ax.add_patch(plt.Rectangle((oxmin, oymin), oxmax - oxmin, oymax - oymin,
+                                               fill=False, color='orange', linewidth=2.5))
+
+                    ax.axis('off')
+                    ax.set_title(
+                        CLASSES[probas_sub[idx].argmax()] + ' ' + REL_CLASSES[probas[idx].argmax()] + ' ' + CLASSES[
+                            probas_obj[idx].argmax()], fontsize=10)
+
+            fig.tight_layout()
+
+            plt.savefig(inf_path, dpi=300, bbox_inches='tight')
         
 
 if __name__ == '__main__':

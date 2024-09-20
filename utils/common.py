@@ -310,9 +310,9 @@ def get_args_parser():
                         help="relationship evaluation either using Lukasiewicz's And(0)  or Reichenbach's Implies(1) ")
         
     # constraint
-    parser.add_argument('--neg_constr_path', default='constraint/tgv2_so_neg_constr.csv',
+    parser.add_argument('--neg_constr_path', default='constraint/tgv2_neg_constr_pair_rel.csv',
                         help='relative path of negative constraint file')
-    parser.add_argument('--pos_constr_path', default='constraint/tgv2_pos_constr_v3.csv',
+    parser.add_argument('--pos_constr_path', default='constraint/tgv2_pos_constr_pair_rel.csv',
                         help='relative path of positive constraint file')
     
     parser.add_argument('--use_snc', action='store_true',  help="use SNC instead of FNC")
@@ -372,8 +372,8 @@ def get_args_parser():
     
     # dataset parameters
     parser.add_argument('--dataset', default='tg', help='Name of dataset. Dataset supported is tg ( traffic genome)')
-    parser.add_argument('--ann_path', default='coco_traffic_genome_v2/', type=str)
-    parser.add_argument('--img_folder', default='coco_traffic_genome_v2/images/', type=str)
+    parser.add_argument('--ann_path', default='coco_mix_dataset_v2/', type=str)
+    parser.add_argument('--img_folder', default='coco_mix_dataset_v2/images/', type=str)
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
@@ -403,6 +403,7 @@ def get_args_parser():
     parser.add_argument('--only_r_cls', action='store_true', help='print only recall per class')
     # distributed training parameters
     parser.add_argument('--distributed', action='store_false', help='to enable multigpu support')
+    parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes or gpu in case of 1 node sent')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
@@ -455,7 +456,10 @@ def constr_version(constr_path:str)-> int:
         v = 3
     elif constr_path.startswith('constraint/tail'):
         v = 4
-        
+    elif constr_path.endswith('pair_rel.csv'):
+        v = 5
+    elif constr_path.endswith('pair_rel_tail.csv'):
+        v = 6
     else:
         raise ValueError('Invalid constraints!')
        
