@@ -1,5 +1,5 @@
 """
-The `logltn.core` module contains the main functionalities of LTNtorch. In particular, it contains the definitions of
+The `ltn.core` module contains the main functionalities of LTNtorch. In particular, it contains the definitions of
 constants, variables, predicates, functions, connectives, and quantifiers.
 """
 
@@ -7,7 +7,7 @@ import copy
 import torch
 from torch import nn
 import numpy as np
-import ltn_log as logltn
+import ltn
 import types
 
 
@@ -87,7 +87,7 @@ class Constant(LTNObject):
 
     Notes
     -----
-    - LTN constants are :ref:`LTN objects <noteltnobject>`. :class:`logltn.core.Constant` is a subclass of :class:`logltn.core.LTNObject`;
+    - LTN constants are :ref:`LTN objects <noteltnobject>`. :class:`ltn.core.Constant` is a subclass of :class:`ltn.core.LTNObject`;
     - the attribute `free_vars` for LTN constants is an empty list, since a constant does not have variables by definition;
     - if parameter `trainable` is set to `True`, the LTN constant becomes trainable, namely an embedding;
     - if parameter `trainable` is set to `True`, then the `value` attribute of the LTN constant will be used as an initialization for the embedding of the constant.
@@ -98,7 +98,7 @@ class Constant(LTNObject):
 
     >>> import ltn
     >>> import torch
-    >>> c = logltn.Constant(torch.tensor([3.4, 5.4, 4.3]))
+    >>> c = ltn.Constant(torch.tensor([3.4, 5.4, 4.3]))
     >>> print(c)
     Constant(value=tensor([3.4000, 5.4000, 4.3000]), free_vars=[])
     >>> print(c.value)
@@ -110,7 +110,7 @@ class Constant(LTNObject):
 
     Trainable constant
 
-    >>> t_c = logltn.Constant(torch.tensor([[3.4, 2.3, 5.6],
+    >>> t_c = ltn.Constant(torch.tensor([[3.4, 2.3, 5.6],
     ...                                  [6.7, 5.6, 4.3]]), trainable=True)
     >>> print(t_c)
     Constant(value=tensor([[3.4000, 2.3000, 5.6000],
@@ -126,7 +126,7 @@ class Constant(LTNObject):
     def __init__(self, value, trainable=False):
         # create sub-object of type LTNObject
         super(Constant, self).__init__(value, [])
-        self.value = self.value.to(logltn.device)
+        self.value = self.value.to(ltn.device)
         if trainable:
             # we need to ensure that the tensor is float to set the required_grad to True, since PyTorch needs a float
             # tensor in this case
@@ -165,10 +165,10 @@ class Variable(LTNObject):
 
     Notes
     -----
-    - LTN variables are :ref:`LTN objects <noteltnobject>`. :class:`logltn.core.Variable` is a subclass of :class:`logltn.core.LTNObject`;
+    - LTN variables are :ref:`LTN objects <noteltnobject>`. :class:`ltn.core.Variable` is a subclass of :class:`ltn.core.LTNObject`;
     - the first dimension of an LTN variable is associated with the number of individuals in the variable, while the other dimensions are associated with the features of the individuals;
     - setting `add_batch_dim` to `False` is useful, for instance, when an LTN variable is used to denote a sequence of indexes (for example indexes for retrieving values in tensors);
-    - variable labels starting with '_diag' are reserved for diagonal quantification (:func:`logltn.core.diag`).
+    - variable labels starting with '_diag' are reserved for diagonal quantification (:func:`ltn.core.diag`).
 
     Examples
     --------
@@ -177,7 +177,7 @@ class Variable(LTNObject):
 
     >>> import ltn
     >>> import torch
-    >>> x = logltn.Variable('x', torch.tensor([[3.4, 4.5],
+    >>> x = ltn.Variable('x', torch.tensor([[3.4, 4.5],
     ...                                     [6.7, 9.6]]), add_batch_dim=True)
     >>> print(x)
     Variable(value=tensor([[3.4000, 4.5000],
@@ -192,7 +192,7 @@ class Variable(LTNObject):
 
     `add_bath_dim=True` adds a batch dimension to the `value` of the variable since it has only one dimension.
 
-    >>> y = logltn.Variable('y', torch.tensor([3.4, 4.5, 8.9]), add_batch_dim=True)
+    >>> y = ltn.Variable('y', torch.tensor([3.4, 4.5, 8.9]), add_batch_dim=True)
     >>> print(y)
     Variable(value=tensor([[3.4000],
             [4.5000],
@@ -209,7 +209,7 @@ class Variable(LTNObject):
     `add_batch_dim=False` tells to LTNtorch to not add a batch dimension to the `value` of the variable. This is useful
     when a variable contains a sequence of indexes.
 
-    >>> z = logltn.Variable('z', torch.tensor([1, 2, 3]), add_batch_dim=False)
+    >>> z = ltn.Variable('z', torch.tensor([1, 2, 3]), add_batch_dim=False)
     >>> print(z)
     Variable(value=tensor([1, 2, 3]), free_vars=['z'])
     >>> print(z.value)
@@ -243,7 +243,7 @@ class Variable(LTNObject):
             # is set to True
             self.value = self.value.view(self.value.shape[0], 1)
 
-        self.value = self.value.to(logltn.device)
+        self.value = self.value.to(ltn.device)
         self.latent_var = var_label
 
     def __repr__(self):
@@ -379,7 +379,7 @@ class Predicate(nn.Module):
 
     Notes
     -----
-    - the output of an LTN predicate is always an :ref:`LTN object <noteltnobject>` (:class:`logltn.core.LTNObject`);
+    - the output of an LTN predicate is always an :ref:`LTN object <noteltnobject>` (:class:`ltn.core.LTNObject`);
     - LTNtorch allows to define a predicate using a trainable model **or** a python function, not both;
     - defining a predicate using a python function is suggested only for simple and non-learnable mathematical operations;
     - examples of LTN predicates could be similarity measures, classifiers, etc;
@@ -387,7 +387,7 @@ class Predicate(nn.Module):
     - evaluating a predicate with one variable of :math:`n` individuals yields :math:`n` output values, where the :math:`i_{th}` output value corresponds to the predicate calculated with the :math:`i_{th}` individual;
     - evaluating a predicate with :math:`k` variables :math:`(x_1, \dots, x_k)` with respectively :math:`n_1, \dots, n_k` individuals each, yields a result with :math:`n_1 * \dots * n_k` values. The result is organized in a tensor where the first :math:`k` dimensions can be indexed to retrieve the outcome(s) that correspond to each variable;
     - the attribute `free_vars` of the `LTNobject` output by the predicate tells which dimension corresponds to which variable in the `value` of the `LTNObject`. See :ref:`LTN broadcasting <broadcasting>` for more information;
-    - to disable the :ref:`LTN broadcasting <broadcasting>`, see :func:`logltn.core.diag()`.
+    - to disable the :ref:`LTN broadcasting <broadcasting>`, see :func:`ltn.core.diag()`.
 
     Attributes
     ----------
@@ -414,7 +414,7 @@ class Predicate(nn.Module):
     ...                         torch.nn.Linear(2, 1),
     ...                         torch.nn.Sigmoid()
     ...                   )
-    >>> p = logltn.Predicate(model=predicate_model)
+    >>> p = ltn.Predicate(model=predicate_model)
     >>> print(p)
     Predicate(model=Sequential(
       (0): Linear(in_features=4, out_features=2, bias=True)
@@ -428,7 +428,7 @@ class Predicate(nn.Module):
     of the individuals. Notice that the output of the print is `Predicate(model=LambdaModel())`. This indicates that the
     LTN predicate has been defined using a function, through the `func` parameter of the constructor.
 
-    >>> p_f = logltn.Predicate(func=lambda x: torch.nn.Sigmoid()(torch.sum(x, dim=1)))
+    >>> p_f = ltn.Predicate(func=lambda x: torch.nn.Sigmoid()(torch.sum(x, dim=1)))
     >>> print(p_f)
     Predicate(model=LambdaModel())
 
@@ -450,7 +450,7 @@ class Predicate(nn.Module):
     ...         return out
     ...
     >>> predicate_model = PredicateModel()
-    >>> b_p = logltn.Predicate(model=predicate_model)
+    >>> b_p = ltn.Predicate(model=predicate_model)
     >>> print(b_p)
     Predicate(model=PredicateModel(
       (dense1): Linear(in_features=4, out_features=5, bias=True)
@@ -460,7 +460,7 @@ class Predicate(nn.Module):
     Binary predicate defined using a function. Note the call to `torch.cat` to merge the two inputs of the
     binary predicate.
 
-    >>> b_p_f = logltn.Predicate(func=lambda x, y: torch.nn.Sigmoid()(
+    >>> b_p_f = ltn.Predicate(func=lambda x, y: torch.nn.Sigmoid()(
     ...                                             torch.sum(torch.cat([x, y], dim=1), dim=1)
     ...                                         ))
     >>> print(b_p_f)
@@ -468,16 +468,16 @@ class Predicate(nn.Module):
 
     Evaluation of a unary predicate on a constant. Note that:
 
-    - the predicate returns a :class:`logltn.core.LTNObject` instance;
+    - the predicate returns a :class:`ltn.core.LTNObject` instance;
     - since a constant has been given, the `LTNObject` in output does not have free variables;
     - the shape of the `LTNObject` in output is empty since the predicate has been evaluated on a constant, namely on one single individual;
     - the attribute `value` of the `LTNObject` in output contains the result of the evaluation of the predicate;
     - the `value` is in the range [0., 1.] since it has to be interpreted as a truth value. This is assured thanks to the *sigmoid function* in the definition of the predicate.
 
-    >>> c = logltn.Constant(torch.tensor([0.5, 0.01, 0.34, 0.001]))
+    >>> c = ltn.Constant(torch.tensor([0.5, 0.01, 0.34, 0.001]))
     >>> out = p_f(c)
     >>> print(type(out))
-    <class 'logltn.core.LTNObject'>
+    <class 'ltn.core.LTNObject'>
     >>> print(out)
     LTNObject(value=tensor(0.7008), free_vars=[])
     >>> print(out.value)
@@ -492,7 +492,7 @@ class Predicate(nn.Module):
     - since a variable has been given, the `LTNObject` in output has one free variable;
     - the shape of the `LTNObject` in output is 2 since the predicate has been evaluated on a variable with two individuls.
 
-    >>> v = logltn.Variable('v', torch.tensor([[0.4, 0.3],
+    >>> v = ltn.Variable('v', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
     >>> out = p_f(v)
     >>> print(out)
@@ -509,9 +509,9 @@ class Predicate(nn.Module):
     - like in the previous example, the `LTNObject` in output has just one free variable, since only one variable has been given to the predicate;
     - the shape of the `LTNObject` in output is 2 since the predicate has been evaluated on a variable with two individuals. The constant does not add dimensions to the output.
 
-    >>> v = logltn.Variable('v', torch.tensor([[0.4, 0.3],
+    >>> v = ltn.Variable('v', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
-    >>> c = logltn.Constant(torch.tensor([0.4, 0.04, 0.23, 0.43]))
+    >>> c = ltn.Constant(torch.tensor([0.4, 0.04, 0.23, 0.43]))
     >>> out = b_p_f(v, c)
     >>> print(out)
     LTNObject(value=tensor([0.8581, 0.8120]), free_vars=['v'])
@@ -529,9 +529,9 @@ class Predicate(nn.Module):
     - the first dimension is dedicated to variable `x`, which is also the first one appearing in `free_vars`, while the second dimension is dedicated to variable `y`, which is the second one appearing in `free_vars`;
     - it is possible to access the `value` attribute for getting the results of the predicate. For example, at position `(1, 2)` there is the evaluation of the predicate on the second individual of `x` and third individuals of `y`.
 
-    >>> x = logltn.Variable('x', torch.tensor([[0.4, 0.3],
+    >>> x = ltn.Variable('x', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
-    >>> y = logltn.Variable('y', torch.tensor([[0.4, 0.04, 0.23],
+    >>> y = ltn.Variable('y', torch.tensor([[0.4, 0.04, 0.23],
     ...                                     [0.2, 0.04, 0.32],
     ...                                     [0.06, 0.08, 0.3]]))
     >>> out = b_p_f(x, y)
@@ -587,12 +587,12 @@ class Predicate(nn.Module):
 
         Parameters
         ----------
-        inputs : :obj:`tuple` of :class:`logltn.core.LTNObject`
+        inputs : :obj:`tuple` of :class:`ltn.core.LTNObject`
             Tuple of :ref:`LTN objects <noteltnobject>` for which the predicate has to be computed.
 
         Returns
         ----------
-        :class:`logltn.core.LTNObject`
+        :class:`ltn.core.LTNObject`
             An :ref:`LTNObject <noteltnobject>` whose `value` attribute contains the truth values representing the result of the
             predicate, while `free_vars` attribute contains the labels of the free variables contained in the result.
 
@@ -660,7 +660,7 @@ class Function(nn.Module):
 
     Notes
     -----
-    - the output of an LTN function is always an :ref:`LTN object <noteltnobject>` (:class:`logltn.core.LTNObject`);
+    - the output of an LTN function is always an :ref:`LTN object <noteltnobject>` (:class:`ltn.core.LTNObject`);
     - LTNtorch allows to define a function using a trainable model **or** a python function, not both;
     - defining an LTN function using a python function is suggested only for simple and non-learnable mathematical operations;
     - examples of LTN functions could be distance functions, regressors, etc;
@@ -668,7 +668,7 @@ class Function(nn.Module):
     - evaluating a function with one variable of :math:`n` individuals yields :math:`n` output values, where the :math:`i_{th}` output value corresponds to the function calculated with the :math:`i_{th}` individual;
     - evaluating a function with :math:`k` variables :math:`(x_1, \dots, x_k)` with respectively :math:`n_1, \dots, n_k` individuals each, yields a result with :math:`n_1 * \dots * n_k` values. The result is organized in a tensor where the first :math:`k` dimensions can be indexed to retrieve the outcome(s) that correspond to each variable;
     - the attribute `free_vars` of the `LTNobject` output by the function tells which dimension corresponds to which variable in the `value` of the `LTNObject`. See :ref:`LTN broadcasting <broadcasting>` for more information;
-    - to disable the :ref:`LTN broadcasting <broadcasting>`, see :func:`logltn.core.diag()`.
+    - to disable the :ref:`LTN broadcasting <broadcasting>`, see :func:`ltn.core.diag()`.
 
     Examples
     --------
@@ -681,7 +681,7 @@ class Function(nn.Module):
     ...                         torch.nn.ELU(),
     ...                         torch.nn.Linear(3, 2)
     ...                   )
-    >>> f = logltn.Function(model=function_model)
+    >>> f = ltn.Function(model=function_model)
     >>> print(f)
     Function(model=Sequential(
       (0): Linear(in_features=4, out_features=3, bias=True)
@@ -694,7 +694,7 @@ class Function(nn.Module):
     of the individuals. Notice that the output of the print is `Function(model=LambdaModel())`. This indicates that the
     LTN function has been defined using a function, through the `func` parameter of the constructor.
 
-    >>> f_f = logltn.Function(func=lambda x: torch.repeat_interleave(
+    >>> f_f = ltn.Function(func=lambda x: torch.repeat_interleave(
     ...                                              torch.sum(x, dim=1, keepdim=True), 2, dim=1)
     ...                                         )
     >>> print(f_f)
@@ -717,7 +717,7 @@ class Function(nn.Module):
     ...         return out
     ...
     >>> function_model = FunctionModel()
-    >>> b_f = logltn.Function(model=function_model)
+    >>> b_f = ltn.Function(model=function_model)
     >>> print(b_f)
     Function(model=FunctionModel(
       (dense1): Linear(in_features=4, out_features=5, bias=True)
@@ -726,7 +726,7 @@ class Function(nn.Module):
     Binary function defined using a function. Note the call to `torch.cat` to merge the two inputs of the
     binary function.
 
-    >>> b_f_f = logltn.Function(func=lambda x, y:
+    >>> b_f_f = ltn.Function(func=lambda x, y:
     ...                                 torch.repeat_interleave(
     ...                                     torch.sum(torch.cat([x, y], dim=1), dim=1, keepdim=True), 2,
     ...                                     dim=1))
@@ -735,15 +735,15 @@ class Function(nn.Module):
 
     Evaluation of a unary function on a constant. Note that:
 
-    - the function returns a :class:`logltn.core.LTNObject` instance;
+    - the function returns a :class:`ltn.core.LTNObject` instance;
     - since a constant has been given, the `LTNObject` in output does not have free variables;
     - the shape of the `LTNObject` in output is `(2)` since the function has been evaluated on a constant, namely on one single individual, and returns individuals in :math:`\mathbb{R}^2`;
     - the attribute `value` of the `LTNObject` in output contains the result of the evaluation of the function.
 
-    >>> c = logltn.Constant(torch.tensor([0.5, 0.01, 0.34, 0.001]))
+    >>> c = ltn.Constant(torch.tensor([0.5, 0.01, 0.34, 0.001]))
     >>> out = f_f(c)
     >>> print(type(out))
-    <class 'logltn.core.LTNObject'>
+    <class 'ltn.core.LTNObject'>
     >>> print(out)
     LTNObject(value=tensor([0.8510, 0.8510]), free_vars=[])
     >>> print(out.value)
@@ -758,7 +758,7 @@ class Function(nn.Module):
     - since a variable has been given, the `LTNObject` in output has one free variable;
     - the shape of the `LTNObject` in output is `(2, 2)` since the function has been evaluated on a variable with two individuls and returns individuals in :math:`\mathbb{R}^2`.
 
-    >>> v = logltn.Variable('v', torch.tensor([[0.4, 0.3],
+    >>> v = ltn.Variable('v', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
     >>> out = f_f(v)
     >>> print(out)
@@ -777,9 +777,9 @@ class Function(nn.Module):
     - like in the previous example, the `LTNObject` in output has just one free variable, since only one variable has been given to the predicate;
     - the shape of the `LTNObject` in output is `(2, 2)` since the function has been evaluated on a variable with two individuals and returns individuals in :math:`\mathbb{R}^2`. The constant does not add dimensions to the output.
 
-    >>> v = logltn.Variable('v', torch.tensor([[0.4, 0.3],
+    >>> v = ltn.Variable('v', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
-    >>> c = logltn.Constant(torch.tensor([0.4, 0.04, 0.23, 0.43]))
+    >>> c = ltn.Constant(torch.tensor([0.4, 0.04, 0.23, 0.43]))
     >>> out = b_f_f(v, c)
     >>> print(out)
     LTNObject(value=tensor([[1.8000, 1.8000],
@@ -799,9 +799,9 @@ class Function(nn.Module):
     - the first dimension is dedicated to variable `x`, which is also the first one appearing in `free_vars`, the second dimension is dedicated to variable `y`, which is the second one appearing in `free_vars`, while the last dimensions is dedicated to the features of the individuals in output;
     - it is possible to access the `value` attribute for getting the results of the function. For example, at position `(1, 2)` there is the evaluation of the function on the second individual of `x` and third individuals of `y`.
 
-    >>> x = logltn.Variable('x', torch.tensor([[0.4, 0.3],
+    >>> x = ltn.Variable('x', torch.tensor([[0.4, 0.3],
     ...                                     [0.32, 0.043]]))
-    >>> y = logltn.Variable('y', torch.tensor([[0.4, 0.04, 0.23],
+    >>> y = ltn.Variable('y', torch.tensor([[0.4, 0.04, 0.23],
     ...                                     [0.2, 0.04, 0.32],
     ...                                     [0.06, 0.08, 0.3]]))
     >>> out = b_f_f(x, y)
@@ -868,12 +868,12 @@ class Function(nn.Module):
 
         Parameters
         ----------
-        inputs : :obj:`tuple` of :class:`logltn.core.LTNObject`
+        inputs : :obj:`tuple` of :class:`ltn.core.LTNObject`
             Tuple of :ref:`LTN objects <noteltnobject>` for which the function has to be computed.
 
         Returns
         ----------
-        :class:`logltn.core.LTNObject`
+        :class:`ltn.core.LTNObject`
             An :ref:`LTNObject <noteltnobject>` whose `value` attribute contains the result of the
             function, while `free_vars` attribute contains the labels of the free variables contained in the result.
 
@@ -909,12 +909,12 @@ class Function(nn.Module):
 
         Parameters
         ----------
-        inputs : :obj:`tuple` of :class:`logltn.core.LTNObject`
+        inputs : :obj:`tuple` of :class:`ltn.core.LTNObject`
             Tuple of :ref:`LTN objects <noteltnobject>` for which the function has to be computed.
 
         Returns
         ----------
-        :class:`logltn.core.LTNObject`
+        :class:`ltn.core.LTNObject`
             An :ref:`LTNObject <noteltnobject>` whose `value` attribute contains the result of the
             function, while `free_vars` attribute contains the labels of the free variables contained in the result.
 
@@ -953,12 +953,12 @@ def diag(*vars):
 
     Parameters
     ----------
-    vars : :obj:`tuple` of :class:`logltn.core.Variable`
+    vars : :obj:`tuple` of :class:`ltn.core.Variable`
         Tuple of LTN variables for which the diagonal quantification has to be set.
 
     Returns
     ---------
-    :obj:`list` of :class:`logltn.core.Variable`
+    :obj:`list` of :class:`ltn.core.Variable`
         List of the same LTN variables given in input, prepared for the use of :ref:`diagonal quantification <diagonal>`.
 
     Raises
@@ -977,7 +977,7 @@ def diag(*vars):
 
     See Also
     --------
-    :func:`logltn.core.undiag`
+    :func:`ltn.core.undiag`
         It allows to disable the diagonal quantification for the given variables.
 
     Examples
@@ -990,11 +990,11 @@ def diag(*vars):
 
     >>> import ltn
     >>> import torch
-    >>> p = logltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
+    >>> p = ltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
     ...                                         torch.sum(torch.cat([a, b], dim=1), dim=1)
     ...                                     ))
-    >>> x = logltn.Variable('x', torch.tensor([[0.3, 0.56, 0.43], [0.3, 0.5, 0.04]]))
-    >>> y = logltn.Variable('y', torch.tensor([[0.4, 0.004], [0.3, 0.32]]))
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 0.56, 0.43], [0.3, 0.5, 0.04]]))
+    >>> y = ltn.Variable('y', torch.tensor([[0.4, 0.004], [0.3, 0.32]]))
     >>> out = p(x, y)
     >>> print(out.value)
     tensor([[0.8447, 0.8710],
@@ -1012,7 +1012,7 @@ def diag(*vars):
     - the `free_vars` attribute of the `LTNObject` in output has just one variable, even if two variables have been given to the predicate. This is due to diagonal quantification;
     - when diagonal quantification is set, you will se a variable label starting with `diag_` in the `free_Vars` attribute.
 
-    >>> x, y = logltn.diag(x, y)
+    >>> x, y = ltn.diag(x, y)
     >>> out = p(x, y)
     >>> print(out.value)
     tensor([0.8447, 0.8115])
@@ -1021,7 +1021,7 @@ def diag(*vars):
     >>> print(out.shape())
     torch.Size([2])
 
-    See the examples under :class:`logltn.core.Quantifier` to see how to use :func:`logltn.core.diag` with quantifiers.
+    See the examples under :class:`ltn.core.Quantifier` to see how to use :func:`ltn.core.diag` with quantifiers.
     """
     vars = list(vars)
     # check if a list of LTN variables has been passed
@@ -1050,7 +1050,7 @@ def undiag(*vars):
 
     Parameters
     ----------
-    vars : :obj:`tuple` of :class:`logltn.core.Variable`
+    vars : :obj:`tuple` of :class:`ltn.core.Variable`
         Tuple of LTN variables for which the :ref:`diagonal quantification <diagonal>` setting has to be removed.
 
     Returns
@@ -1065,7 +1065,7 @@ def undiag(*vars):
 
     See Also
     --------
-    :func:`logltn.core.diag`
+    :func:`ltn.core.diag`
         It allows to set the :ref:`diagonal quantification <diagonal>` for the given variables.
 
     Examples
@@ -1080,12 +1080,12 @@ def undiag(*vars):
 
     >>> import ltn
     >>> import torch
-    >>> p = logltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
+    >>> p = ltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
     ...                                         torch.sum(torch.cat([a, b], dim=1), dim=1)
     ...                                     ))
-    >>> x = logltn.Variable('x', torch.tensor([[0.3, 0.56, 0.43], [0.3, 0.5, 0.04]]))
-    >>> y = logltn.Variable('y', torch.tensor([[0.4, 0.004], [0.3, 0.32]]))
-    >>> x, y = logltn.diag(x, y)
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 0.56, 0.43], [0.3, 0.5, 0.04]]))
+    >>> y = ltn.Variable('y', torch.tensor([[0.4, 0.004], [0.3, 0.32]]))
+    >>> x, y = ltn.diag(x, y)
     >>> out = p(x, y)
     >>> print(out.value)
     tensor([0.8447, 0.8115])
@@ -1094,14 +1094,14 @@ def undiag(*vars):
     >>> print(out.shape())
     torch.Size([2])
 
-    :func:`logltn.core.undiag` can be used to restore the :ref:`LTN broadcasting <broadcasting>` for the two variables. In
+    :func:`ltn.core.undiag` can be used to restore the :ref:`LTN broadcasting <broadcasting>` for the two variables. In
     the following, it is shown the behavior of the same predicate without diagonal quantification. Note that:
 
     - since diagonal quantification has been disabled, LTNtorch applies the :ref:`LTN broadcasting <broadcasting>` to the variables before computing the predicate;
     - the shape of the `LTNObject` in output is `(2, 2)` since the predicate has been computed on two variables with two individuals each;
     - the `free_vars` attribute of the `LTNObject` in output contains two variables, namely the variables on which the predicate has been computed.
 
-    >>> x, y = logltn.undiag(x, y)
+    >>> x, y = ltn.undiag(x, y)
     >>> out = p(x, y)
     >>> print(out.value)
     tensor([[0.8447, 0.8710],
@@ -1133,12 +1133,12 @@ class Connective:
 
     Parameters
     ----------
-    connective_op : :class:`logltn.fuzzy_ops.ConnectiveOperator`
+    connective_op : :class:`ltn.fuzzy_ops.ConnectiveOperator`
         The unary/binary fuzzy connective operator that becomes the :ref:`grounding <notegrounding>` of the LTN connective.
 
     Attributes
     -----------
-    connective_op : :class:`logltn.fuzzy_ops.ConnectiveOperator`
+    connective_op : :class:`ltn.fuzzy_ops.ConnectiveOperator`
         See `connective_op` parameter.
 
     Raises
@@ -1148,27 +1148,27 @@ class Connective:
 
     Notes
     -----
-    - the LTN connective supports various fuzzy connective operators. They can be found in :ref:`logltn.fuzzy_ops <fuzzyop>`;
+    - the LTN connective supports various fuzzy connective operators. They can be found in :ref:`ltn.fuzzy_ops <fuzzyop>`;
     - the LTN connective allows to use these fuzzy operators with LTN formulas. It takes care of combining sub-formulas which have different variables appearing in them (:ref:`LTN broadcasting <broadcasting>`).
     - an LTN connective can be applied only to :ref:`LTN objects <noteltnobject>` containing truth values, namely values in :math:`[0., 1.]`;
-    - the output of an LTN connective is always an :ref:`LTN object <noteltnobject>` (:class:`logltn.core.LTNObject`).
+    - the output of an LTN connective is always an :ref:`LTN object <noteltnobject>` (:class:`ltn.core.LTNObject`).
 
     .. automethod:: __call__
 
     See Also
     --------
-    :class:`logltn.fuzzy_ops`
-        The `logltn.fuzzy_ops` module contains the definition of common fuzzy connective operators that can be used with LTN connectives.
+    :class:`ltn.fuzzy_ops`
+        The `ltn.fuzzy_ops` module contains the definition of common fuzzy connective operators that can be used with LTN connectives.
 
     Examples
     --------
     Use of :math:`\\land` to create a formula which is the conjunction of two predicates. Note that:
 
     - a connective operator can be applied only to inputs which represent truth values. In this case with have two predicates;
-    - LTNtorch provides various semantics for the conjunction, here we use the Goguen conjunction (:class:`logltn.fuzzy_ops.AndProd`);
+    - LTNtorch provides various semantics for the conjunction, here we use the Goguen conjunction (:class:`ltn.fuzzy_ops.AndProd`);
     - LTNtorch applies the :ref:`LTN broadcasting <broadcasting>` to the variables before computing the predicates;
     - LTNtorch applies the :ref:`LTN brodcasting <broadcasting>` to the operands before applying the selected conjunction operator;
-    - the result of a connective operator is a :class:`logltn.core.LTNObject` instance containing truth values in [0., 1.];
+    - the result of a connective operator is a :class:`ltn.core.LTNObject` instance containing truth values in [0., 1.];
     - the attribute `value` of the `LTNObject` in output contains the result of the connective operator;
     - the shape of the `LTNObject` in output is `(2, 3, 4)`. The first dimension is associated with variable `x`, which has two individuals, the second dimension with variable `y`, which has three individuals, while the last dimension with variable `z`, which has four individuals;
     - it is possible to access to specific results by indexing the attribute `value`. For example, at index `(0, 1, 2)` there is the evaluation of the formula on the first individual of `x`, second individual of `y`, and third individual of `z`;
@@ -1176,22 +1176,22 @@ class Connective:
 
     >>> import ltn
     >>> import torch
-    >>> p = logltn.Predicate(func=lambda a: torch.nn.Sigmoid()(
+    >>> p = ltn.Predicate(func=lambda a: torch.nn.Sigmoid()(
     ...                                     torch.sum(a, dim=1)
     ...                                  ))
-    >>> q = logltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
+    >>> q = ltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
     ...                                         torch.sum(torch.cat([a, b], dim=1),
     ...                                     dim=1)))
-    >>> x = logltn.Variable('x', torch.tensor([[0.3, 0.5],
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 0.5],
     ...                                     [0.04, 0.43]]))
-    >>> y = logltn.Variable('y', torch.tensor([[0.5, 0.23],
+    >>> y = ltn.Variable('y', torch.tensor([[0.5, 0.23],
     ...                                     [4.3, 9.3],
     ...                                     [4.3, 0.32]]))
-    >>> z = logltn.Variable('z', torch.tensor([[0.3, 0.4, 0.43],
+    >>> z = ltn.Variable('z', torch.tensor([[0.3, 0.4, 0.43],
     ...                                     [0.4, 4.3, 5.1],
     ...                                     [1.3, 4.3, 2.3],
     ...                                     [0.4, 0.2, 1.2]]))
-    >>> And = logltn.Connective(logltn.fuzzy_ops.AndProd())
+    >>> And = ltn.Connective(ltn.fuzzy_ops.AndProd())
     >>> print(And)
     Connective(connective_op=AndProd(stable=True))
     >>> out = And(p(x), q(y, z))
@@ -1218,9 +1218,9 @@ class Connective:
     """
 
     def __init__(self, connective_op):
-        if not isinstance(connective_op, logltn.fuzzy_ops.ConnectiveOperator):
+        if not isinstance(connective_op, ltn.fuzzy_ops.ConnectiveOperator):
             raise TypeError("Connective() : argument 'connective_op' (position 1) must be a "
-                            "logltn.fuzzy_ops.ConnectiveOperator, not " + str(type(connective_op)))
+                            "ltn.fuzzy_ops.ConnectiveOperator, not " + str(type(connective_op)))
         self.connective_op = connective_op
 
     def __repr__(self):
@@ -1233,13 +1233,13 @@ class Connective:
 
         Parameters
         -----------
-        operands : :obj:`tuple` of :class:`logltn.core.LTNObject`
+        operands : :obj:`tuple` of :class:`ltn.core.LTNObject`
             Tuple of :ref:`LTN objects <noteltnobject>` representing the operands to which the fuzzy connective
             operator has to be applied.
 
         Returns
         ----------
-        :class:`logltn.core.LTNObject`
+        :class:`ltn.core.LTNObject`
             The `LTNObject` that is the result of the application of the fuzzy connective operator to the given
             :ref:`LTN objects <noteltnobject>`.
 
@@ -1254,9 +1254,9 @@ class Connective:
         """
         operands = list(operands)
 
-        if isinstance(self.connective_op, logltn.fuzzy_ops.UnaryConnectiveOperator) and len(operands) != 1:
+        if isinstance(self.connective_op, ltn.fuzzy_ops.UnaryConnectiveOperator) and len(operands) != 1:
             raise ValueError("Expected one operand for a unary connective, but got " + str(len(operands)))
-        if isinstance(self.connective_op, logltn.fuzzy_ops.BinaryConnectiveOperator) and len(operands) != 2:
+        if isinstance(self.connective_op, ltn.fuzzy_ops.BinaryConnectiveOperator) and len(operands) != 2:
             raise ValueError("Expected two operands for a binary connective, but got " + str(len(operands)))
 
         if not all(isinstance(x, LTNObject) for x in operands):
@@ -1264,7 +1264,7 @@ class Connective:
                             str([type(o) for o in operands]))
 
         # check if operands are in [0., 1.]
-        logltn.fuzzy_ops.check_values(*[o.value for o in operands])
+        ltn.fuzzy_ops.check_values(*[o.value for o in operands])
 
         proc_objs, vars, n_individuals_per_var = process_ltn_objects(operands)
         # the connective operator needs the values of the objects and not the objects themselves
@@ -1290,14 +1290,14 @@ class Quantifier:
 
     Parameters
     ----------
-    agg_op : :class:`logltn.fuzzy_ops.AggregationOperator`
+    agg_op : :class:`ltn.fuzzy_ops.AggregationOperator`
         The fuzzy aggregation operator that becomes the :ref:`grounding <notegrounding>` of the LTN quantifier.
     quantifier : :obj:`str`
         String indicating the quantification that has to be performed ('e' for ∃, or 'f' for ∀).
 
     Attributes
     -----------
-    agg_op : :class:`logltn.fuzzy_ops.AggregationOperator`
+    agg_op : :class:`ltn.fuzzy_ops.AggregationOperator`
         See `agg_op` parameter.
     quantifier : :obj:`str`
         See `quantifier` parameter.
@@ -1312,18 +1312,18 @@ class Quantifier:
 
     Notes
     -----
-    - the LTN quantifier supports various fuzzy aggregation operators, which can be found in :class:`logltn.fuzzy_ops`;
+    - the LTN quantifier supports various fuzzy aggregation operators, which can be found in :class:`ltn.fuzzy_ops`;
     - the LTN quantifier allows to use these fuzzy aggregators with LTN formulas. It takes care of selecting the formula (`LTNObject`) dimensions to aggregate, given some LTN variables in arguments.
     - boolean conditions (by setting parameters `mask_fn` and `mask_vars`) can be used for :ref:`guarded quantification <guarded>`;
     - an LTN quantifier can be applied only to :ref:`LTN objects <noteltnobject>` containing truth values, namely values in :math:`[0., 1.]`;
-    - the output of an LTN quantifier is always an :ref:`LTN object <noteltnobject>` (:class:`logltn.core.LTNObject`).
+    - the output of an LTN quantifier is always an :ref:`LTN object <noteltnobject>` (:class:`ltn.core.LTNObject`).
 
     .. automethod:: __call__
 
     See Also
     --------
-    :class:`logltn.fuzzy_ops`
-        The `logltn.fuzzy_ops` module contains the definition of common fuzzy aggregation operators that can be used with
+    :class:`ltn.fuzzy_ops`
+        The `ltn.fuzzy_ops` module contains the definition of common fuzzy aggregation operators that can be used with
         LTN quantifiers.
 
     Examples
@@ -1335,12 +1335,12 @@ class Quantifier:
 
     >>> import ltn
     >>> import torch
-    >>> p = logltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
+    >>> p = ltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
     ...                                         torch.sum(torch.cat([a, b], dim=1),
     ...                                     dim=1)))
-    >>> x = logltn.Variable('x', torch.tensor([[0.3, 1.3],
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 1.3],
     ...                                     [0.3, 0.3]]))
-    >>> y = logltn.Variable('y', torch.tensor([[2.3, 0.3, 0.4],
+    >>> y = ltn.Variable('y', torch.tensor([[2.3, 0.3, 0.4],
     ...                                     [1.2, 3.4, 1.3],
     ...                                     [2.3, 1.4, 1.4]]))
     >>> out = p(x, y)
@@ -1358,13 +1358,13 @@ class Quantifier:
     Universal quantification on one single variable of the same predicate. Note that:
 
     - `quantifier='f'` means that we are defining the fuzzy semantics for the universal quantifier;
-    - the result of a quantification operator is always a :class:`logltn.core.LTNObject` instance;
-    - LTNtorch supports various sematics for quantifiers, here we use :class:`logltn.fuzzy_ops.AggregPMeanError` for :math:`\\forall`;
+    - the result of a quantification operator is always a :class:`ltn.core.LTNObject` instance;
+    - LTNtorch supports various sematics for quantifiers, here we use :class:`ltn.fuzzy_ops.AggregPMeanError` for :math:`\\forall`;
     - the shape of the `LTNObject` in output is `(3)` since the quantification has been performed on variable `x`. Only the dimension associated with variable `y` has left since the quantification has been computed by LTNtorch as an aggregation on the dimension related with variable `x`;
     - the attribute `free_vars` of the `LTNObject` in output contains only the label of variable `y`. This is because variable `x` has been quantified, namely it is not a free variable anymore;
     - in LTNtorch, the quantification is performed by computing the value of the predicate first and then by aggregating on the selected dimensions, specified by the quantified variables.
 
-    >>> Forall = logltn.Quantifier(logltn.fuzzy_ops.AggregPMeanError(), quantifier='f')
+    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier='f')
     >>> print(Forall)
     Quantifier(agg_op=AggregPMeanError(p=2, stable=True), quantifier='f')
     >>> out = Forall(x, p(x, y))
@@ -1397,9 +1397,9 @@ class Quantifier:
 
     - the only way in LTNtorch to apply two different quantifiers to the same formula is a nested syntax;
     - `quantifier='e'` means that we are defining the fuzzy semantics for the existential quantifier;
-    - LTNtorch supports various sematics for quantifiers, here we use :class:`logltn.fuzzy_ops.AggregPMean` for :math:`\\exists`.
+    - LTNtorch supports various sematics for quantifiers, here we use :class:`ltn.fuzzy_ops.AggregPMean` for :math:`\\exists`.
 
-    >>> Exists = logltn.Quantifier(logltn.fuzzy_ops.AggregPMean(), quantifier='e')
+    >>> Exists = ltn.Quantifier(ltn.fuzzy_ops.AggregPMean(), quantifier='e')
     >>> print(Exists)
     Quantifier(agg_op=AggregPMean(p=2, stable=True), quantifier='e')
     >>> out = Forall(x, Exists(y, p(x, y)))
@@ -1435,18 +1435,18 @@ class Quantifier:
     torch.Size([])
 
     Universal quantification of both variables of the same predicate using diagonal quantification
-    (:func:`logltn.core.diag`). Note that:
+    (:func:`ltn.core.diag`). Note that:
 
     - the variables have the same number of individuals since it is a constraint for applying diagonal quantification;
     - since diagonal quantification has been set, the predicate will not be computed on all the possible combinations of individuals of the two variables (that are 4), namely the :ref:`LTN broadcasting <broadcasting>` is disabled;
     - the predicate is computed only on the given tuples of individuals in a one-to-one correspondence, namely on the first individual of `x` and `y`, and second individual of `x` and `y`;
     - the result changes compared to the case without diagonal quantification. This is due to the fact that we are aggregating a smaller number of truth values since the predicate has been computed only two times.
 
-    >>> x = logltn.Variable('x', torch.tensor([[0.3, 1.3],
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 1.3],
     ...                                     [0.3, 0.3]]))
-    >>> y = logltn.Variable('y', torch.tensor([[2.3, 0.3],
+    >>> y = ltn.Variable('y', torch.tensor([[2.3, 0.3],
     ...                                    [1.2, 3.4]]))
-    >>> out = Forall(logltn.diag(x, y), p(x, y)) # with diagonal quantification
+    >>> out = Forall(ltn.diag(x, y), p(x, y)) # with diagonal quantification
     >>> out_without_diag = Forall([x, y], p(x, y)) # without diagonal quantification
     >>> print(out_without_diag)
     LTNObject(value=tensor(0.9788), free_vars=[])
@@ -1462,9 +1462,9 @@ class Quantifier:
     torch.Size([])
     """
     def __init__(self, agg_op, quantifier):
-        if not isinstance(agg_op, logltn.fuzzy_ops.AggregationOperator):
+        if not isinstance(agg_op, ltn.fuzzy_ops.AggregationOperator):
             raise TypeError("Quantifier() : argument 'agg_op' (position 1) must be a "
-                            "logltn.fuzzy_ops.AggregationOperator, not " + str(type(agg_op)))
+                            "ltn.fuzzy_ops.AggregationOperator, not " + str(type(agg_op)))
         self.agg_op = agg_op
         if quantifier not in ["f", "e"]:
             raise ValueError("Expected parameter 'quantifier' to be the string 'e', "
@@ -1485,11 +1485,11 @@ class Quantifier:
 
         Parameters
         -----------
-        vars : :obj:`list` of :class:`logltn.core.Variable`
+        vars : :obj:`list` of :class:`ltn.core.Variable`
             List of LTN variables on which the quantification has to be performed.
-        formula : :class:`logltn.core.LTNObject`
+        formula : :class:`ltn.core.LTNObject`
             Formula on which the quantification has to be performed.
-        cond_vars : :obj:`list` of :class:`logltn.core.Variable`, default=None
+        cond_vars : :obj:`list` of :class:`ltn.core.Variable`, default=None
             List of LTN variables that appear in the :ref:`guarded quantification <guarded>` condition.
         cond_fn : :class:`function`, default=None
             Function representing the :ref:`guarded quantification <guarded>` condition.
@@ -1521,7 +1521,7 @@ class Quantifier:
             raise TypeError("Expected parameter 'formula' to be an LTNObject, but got " + str(type(formula)))
 
         # check if formula is in [0., 1.]
-        logltn.fuzzy_ops.check_values(formula.value)
+        ltn.fuzzy_ops.check_values(formula.value)
 
         if isinstance(vars, Variable):
             vars = [vars]  # this serves in the case vars is just a variable and not a list of variables
@@ -1558,9 +1558,8 @@ class Quantifier:
             # The result of the aggregation operator in such case is often not defined (e.g. NaN).
             # We replace the result with 0.0 if the semantics of the aggregator is exists,
             # or 1.0 if the semantics of the aggregator is forall.
-
-
-            rep_value = 0. if self.quantifier == "f" else -1e5
+            #empty_semantics = 0. if self.semantics == "forall" else -1e5
+            rep_value = 1. if self.quantifier == "f" else 0.
             output = torch.where(
                 torch.isnan(output),
                 rep_value,
@@ -1673,3 +1672,391 @@ class Quantifier:
 
 
 
+
+class QuantifierLog:
+    """
+    Class representing an LTN quantifier.
+
+    An LTN quantifier is :ref:`grounded <notegrounding>` as a fuzzy aggregation operator. See :ref:`quantification in LTN <quantification>`
+    for more information about quantification.
+
+    Parameters
+    ----------
+    agg_op : :class:`ltn.fuzzy_ops.AggregationOperator`
+        The fuzzy aggregation operator that becomes the :ref:`grounding <notegrounding>` of the LTN quantifier.
+    quantifier : :obj:`str`
+        String indicating the quantification that has to be performed ('e' for ∃, or 'f' for ∀).
+
+    Attributes
+    -----------
+    agg_op : :class:`ltn.fuzzy_ops.AggregationOperator`
+        See `agg_op` parameter.
+    quantifier : :obj:`str`
+        See `quantifier` parameter.
+
+    Raises
+    ----------
+    :class:`TypeError`
+        Raises when the type of the `agg_op` parameter is incorrect.
+
+    :class:`ValueError`
+        Raises when the value of the `quantifier` parameter is incorrect.
+
+    Notes
+    -----
+    - the LTN quantifier supports various fuzzy aggregation operators, which can be found in :class:`ltn.fuzzy_ops`;
+    - the LTN quantifier allows to use these fuzzy aggregators with LTN formulas. It takes care of selecting the formula (`LTNObject`) dimensions to aggregate, given some LTN variables in arguments.
+    - boolean conditions (by setting parameters `mask_fn` and `mask_vars`) can be used for :ref:`guarded quantification <guarded>`;
+    - an LTN quantifier can be applied only to :ref:`LTN objects <noteltnobject>` containing truth values, namely values in :math:`[0., 1.]`;
+    - the output of an LTN quantifier is always an :ref:`LTN object <noteltnobject>` (:class:`ltn.core.LTNObject`).
+
+    .. automethod:: __call__
+
+    See Also
+    --------
+    :class:`ltn.fuzzy_ops`
+        The `ltn.fuzzy_ops` module contains the definition of common fuzzy aggregation operators that can be used with
+        LTN quantifiers.
+
+    Examples
+    --------
+    Behavior of a binary predicate evaluated on two variables. Note that:
+
+    - the shape of the `LTNObject` in output is `(2, 3)` since the predicate has been computed on a variable with two individuals and a variable with three individuals;
+    - the attribute `free_vars` of the `LTNObject` in output contains the labels of the two variables given in input to the predicate.
+
+    >>> import ltn
+    >>> import torch
+    >>> p = ltn.Predicate(func=lambda a, b: torch.nn.Sigmoid()(
+    ...                                         torch.sum(torch.cat([a, b], dim=1),
+    ...                                     dim=1)))
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 1.3],
+    ...                                     [0.3, 0.3]]))
+    >>> y = ltn.Variable('y', torch.tensor([[2.3, 0.3, 0.4],
+    ...                                     [1.2, 3.4, 1.3],
+    ...                                     [2.3, 1.4, 1.4]]))
+    >>> out = p(x, y)
+    >>> print(out)
+    LTNObject(value=tensor([[0.9900, 0.9994, 0.9988],
+            [0.9734, 0.9985, 0.9967]]), free_vars=['x', 'y'])
+    >>> print(out.value)
+    tensor([[0.9900, 0.9994, 0.9988],
+            [0.9734, 0.9985, 0.9967]])
+    >>> print(out.free_vars)
+    ['x', 'y']
+    >>> print(out.shape())
+    torch.Size([2, 3])
+
+    Universal quantification on one single variable of the same predicate. Note that:
+
+    - `quantifier='f'` means that we are defining the fuzzy semantics for the universal quantifier;
+    - the result of a quantification operator is always a :class:`ltn.core.LTNObject` instance;
+    - LTNtorch supports various sematics for quantifiers, here we use :class:`ltn.fuzzy_ops.AggregPMeanError` for :math:`\\forall`;
+    - the shape of the `LTNObject` in output is `(3)` since the quantification has been performed on variable `x`. Only the dimension associated with variable `y` has left since the quantification has been computed by LTNtorch as an aggregation on the dimension related with variable `x`;
+    - the attribute `free_vars` of the `LTNObject` in output contains only the label of variable `y`. This is because variable `x` has been quantified, namely it is not a free variable anymore;
+    - in LTNtorch, the quantification is performed by computing the value of the predicate first and then by aggregating on the selected dimensions, specified by the quantified variables.
+
+    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier='f')
+    >>> print(Forall)
+    Quantifier(agg_op=AggregPMeanError(p=2, stable=True), quantifier='f')
+    >>> out = Forall(x, p(x, y))
+    >>> print(out)
+    LTNObject(value=tensor([0.9798, 0.9988, 0.9974]), free_vars=['y'])
+    >>> print(out.value)
+    tensor([0.9798, 0.9988, 0.9974])
+    >>> print(out.free_vars)
+    ['y']
+    >>> print(out.shape())
+    torch.Size([3])
+
+    Universal quantification on both variables of the same predicate. Note that:
+
+    - the shape of the `LTNObject` in output is empty since the quantification has been performed on both variables. No dimension has left since the quantification has been computed by LTNtorch as an aggregation on both dimensions of the `value` of the predicate;
+    - the attribute `free_vars` of the `LTNObject` in output contains no labels of variables. This is because both variables have been quantified, namely they are not free variables anymore.
+
+    >>> out = Forall([x, y], p(x, y))
+    >>> print(out)
+    LTNObject(value=tensor(0.9882), free_vars=[])
+    >>> print(out.value)
+    tensor(0.9882)
+    >>> print(out.free_vars)
+    []
+    >>> print(out.shape())
+    torch.Size([])
+
+    Universal quantification on one variable, and existential quantification on the other variable, of the same predicate.
+    Note that:
+
+    - the only way in LTNtorch to apply two different quantifiers to the same formula is a nested syntax;
+    - `quantifier='e'` means that we are defining the fuzzy semantics for the existential quantifier;
+    - LTNtorch supports various sematics for quantifiers, here we use :class:`ltn.fuzzy_ops.AggregPMean` for :math:`\\exists`.
+
+    >>> Exists = ltn.Quantifier(ltn.fuzzy_ops.AggregPMean(), quantifier='e')
+    >>> print(Exists)
+    Quantifier(agg_op=AggregPMean(p=2, stable=True), quantifier='e')
+    >>> out = Forall(x, Exists(y, p(x, y)))
+    >>> print(out)
+    LTNObject(value=tensor(0.9920), free_vars=[])
+    >>> print(out.value)
+    tensor(0.9920)
+    >>> print(out.free_vars)
+    []
+    >>> print(out.shape())
+    torch.Size([])
+
+    Guarded quantification. We perform a universal quantification on both variables of the same predicate, considering
+    only the individuals of variable `x` whose sum of features is lower than a certain threshold. Note that:
+
+    - guarded quantification requires the parameters `cond_vars` and `cond_fn` to be set;
+    - `cond_vars` contains the variables on which the guarded condition is based on. In this case, we have decided to create a condition on `x`;
+    - `cond_fn` contains the function which is the guarded condition. In this case, it verifies if the sum of features of the individuals of `x` is lower than 1. (our threshold);
+    - the second individual of `x`, which is `[0.3, 0.3]`, satisfies the condition, namely it will not be considered when the aggregation has to be performed. In other words, all the results of the predicate computed using the second individual of `x` will not be considered in the aggregation;
+    - notice the result changes compared to the previous example (:math:`\\forall x \\forall y P(x, y)`). This is due to the fact that some truth values of the result of the predicate are not considered in the aggregation due to guarded quantification. These values are at positions `(1, 0)`, `(1, 1)`, and `(1, 2)`, namely all the positions related with the second individual of `x` in the result of the predicate;
+    - notice that the shape of the `LTNObject` in output and its attribute `free_vars` remain the same compared to the previous example. This is because the quantification is still on both variables, namely it is perfomed on both dimensions of the result of the predicate.
+
+    >>> out = Forall([x, y], p(x, y),
+    ...             cond_vars=[x],
+    ...             cond_fn=lambda x: torch.less(torch.sum(x.value, dim=1), 1.))
+    >>> print(out)
+    LTNObject(value=tensor(0.9844, dtype=torch.float64), free_vars=[])
+    >>> print(out.value)
+    tensor(0.9844, dtype=torch.float64)
+    >>> print(out.free_vars)
+    []
+    >>> print(out.shape())
+    torch.Size([])
+
+    Universal quantification of both variables of the same predicate using diagonal quantification
+    (:func:`ltn.core.diag`). Note that:
+
+    - the variables have the same number of individuals since it is a constraint for applying diagonal quantification;
+    - since diagonal quantification has been set, the predicate will not be computed on all the possible combinations of individuals of the two variables (that are 4), namely the :ref:`LTN broadcasting <broadcasting>` is disabled;
+    - the predicate is computed only on the given tuples of individuals in a one-to-one correspondence, namely on the first individual of `x` and `y`, and second individual of `x` and `y`;
+    - the result changes compared to the case without diagonal quantification. This is due to the fact that we are aggregating a smaller number of truth values since the predicate has been computed only two times.
+
+    >>> x = ltn.Variable('x', torch.tensor([[0.3, 1.3],
+    ...                                     [0.3, 0.3]]))
+    >>> y = ltn.Variable('y', torch.tensor([[2.3, 0.3],
+    ...                                    [1.2, 3.4]]))
+    >>> out = Forall(ltn.diag(x, y), p(x, y)) # with diagonal quantification
+    >>> out_without_diag = Forall([x, y], p(x, y)) # without diagonal quantification
+    >>> print(out_without_diag)
+    LTNObject(value=tensor(0.9788), free_vars=[])
+    >>> print(out_without_diag.value)
+    tensor(0.9788)
+    >>> print(out)
+    LTNObject(value=tensor(0.9888), free_vars=[])
+    >>> print(out.value)
+    tensor(0.9888)
+    >>> print(out.free_vars)
+    []
+    >>> print(out.shape())
+    torch.Size([])
+    """
+    def __init__(self, agg_op, quantifier):
+        if not isinstance(agg_op, ltn.fuzzy_ops.AggregationOperator):
+            raise TypeError("Quantifier() : argument 'agg_op' (position 1) must be a "
+                            "ltn.fuzzy_ops.AggregationOperator, not " + str(type(agg_op)))
+        self.agg_op = agg_op
+        if quantifier not in ["f", "e"]:
+            raise ValueError("Expected parameter 'quantifier' to be the string 'e', "
+                             "for existential quantifier, or the string 'f', "
+                             "for universal quantifier, but got " + str(quantifier))
+        self.quantifier = quantifier
+
+    def __repr__(self):
+        return "Quantifier(agg_op=" + str(self.agg_op) + ", quantifier='" + self.quantifier + "')"
+
+    def __call__(self, vars, formula, cond_vars=None, cond_fn=None, **kwargs):
+        """
+        It applies the selected aggregation operator (`agg_op` attribute) to the formula given in input based on the
+        selected variables.
+
+        It allows also to perform a :ref:`guarded quantification <guarded>` by setting `cond_vars` and `cond_fn`
+        parameters.
+
+        Parameters
+        -----------
+        vars : :obj:`list` of :class:`ltn.core.Variable`
+            List of LTN variables on which the quantification has to be performed.
+        formula : :class:`ltn.core.LTNObject`
+            Formula on which the quantification has to be performed.
+        cond_vars : :obj:`list` of :class:`ltn.core.Variable`, default=None
+            List of LTN variable<<s that appear in the :ref:`guarded quantification <guarded>` condition.
+        cond_fn : :class:`function`, default=None
+            Function representing the :ref:`guarded quantification <guarded>` condition.
+
+        Raises
+        ----------
+        :class:`TypeError`
+            Raises when the types of the input parameters are incorrect.
+
+        :class:`ValueError`
+            Raises when the values of the input parameters are incorrect.
+            Raises when the truth values of the formula given in input are not in the range [0., 1.].
+        """
+        # first of all, check if user has correctly set the condition vars and the condition function
+        if cond_vars is not None and cond_fn is None:
+            raise ValueError("Since 'cond_fn' parameter has been set, 'cond_vars' parameter must be set as well, "
+                             "but got None.")
+        if cond_vars is None and cond_fn is not None:
+            raise ValueError("Since 'cond_vars' parameter has been set, 'cond_fn' parameter must be set as well, "
+                             "but got None.")
+        # check that vars is a list of LTN variables or a single LTN variable
+        if not all(isinstance(x, Variable) for x in vars) if isinstance(vars, list) else not isinstance(vars, Variable):
+            raise TypeError("Expected parameter 'vars' to be a list of Variable or a "
+                            "Variable, but got " + str([type(v) for v in vars])
+                            if isinstance(vars, list) else type(vars))
+
+        # check that formula is an LTNObject
+        if not isinstance(formula, LTNObject):
+            raise TypeError("Expected parameter 'formula' to be an LTNObject, but got " + str(type(formula)))
+
+        # check if formula is in [0., 1.]
+        ltn.fuzzy_ops.check_values(formula.value)
+
+        if isinstance(vars, Variable):
+            vars = [vars]  # this serves in the case vars is just a variable and not a list of variables
+
+        # aggregation_vars contains the labels of the variables on which the quantification has to be performed
+        aggregation_vars = set([var.free_vars[0] for var in vars])
+
+        # check if guarded quantification has to be performed
+        if cond_fn is not None and cond_vars is not None:
+            # check that cond_vars are LTN variables
+            if not all(isinstance(x, Variable) for x in cond_vars) if isinstance(cond_vars, list) \
+                    else not isinstance(cond_vars, Variable):
+                raise TypeError("Expected parameter 'cond_vars' to be a list of Variable or a "
+                                "Variable, but got " + str([type(v) for v in cond_vars])
+                                if isinstance(cond_vars, list) else type(cond_vars))
+            # check that cond_fn is a function
+            if not isinstance(cond_fn, types.LambdaType):
+                raise TypeError("Expected parameter 'cond_fn' to be a function, but got " + str(type(cond_fn)))
+
+            if isinstance(cond_vars, Variable):
+                cond_vars = [cond_vars]  # this serves in the case vars is just a variable and not a list of variables
+
+            # create the mask for applying the guarded quantification
+            formula, mask = self.compute_mask(formula, cond_vars, cond_fn, list(aggregation_vars))
+
+            # we perform the desired quantification
+            # we give the mask to the aggregator for performing the guarded quantification
+            aggregation_dims = [formula.free_vars.index(var) for var in aggregation_vars]
+            output = self.agg_op(formula.value, aggregation_dims, mask=mask.value, **kwargs)
+
+            # For some values in the formula, the mask can result in aggregating with empty variables.
+            #    e.g. forall X ( exists Y:condition(X,Y) ( p(X,Y) ) )
+            #       For some values of X, there may be no Y satisfying the condition
+            # The result of the aggregation operator in such case is often not defined (e.g. NaN).
+            # We replace the result with 0.0 if the semantics of the aggregator is exists,
+            # or 1.0 if the semantics of the aggregator is forall.
+            rep_value = 0. if self.quantifier == "f" else 0.
+            output = torch.where(
+                torch.isnan(output),
+                rep_value,
+                output.double()
+            )
+
+        else:  # in this case, the guarded quantification has not to be performed
+            # aggregation_dims are the dimensions on which the aggregation has to be performed
+            # the aggregator aggregates only on the axes given by aggregations_dims
+            aggregation_dims = [formula.free_vars.index(var) for var in aggregation_vars]
+            # the aggregation operator needs the values of the formula and not the LTNObject containing the values
+            output = self.agg_op(formula.value, dim=tuple(aggregation_dims), **kwargs)
+
+        undiag(*vars)
+        # update the free variables on the output object by removing variables that have been aggregated
+        return LTNObject(output, [var for var in formula.free_vars if var not in aggregation_vars])
+
+    @staticmethod
+    def compute_mask(formula, cond_vars, cond_fn, aggregation_vars):
+        """
+        It computes the mask for performing the guarded quantification on the formula given in input.
+
+        Parameters
+        ----------
+        formula: :class:`LTNObject`
+            Formula that has to be quantified.
+        cond_vars: :obj:`list`
+            List of LTN variables that appear in the guarded quantification condition.
+        cond_fn: :class:`function`
+            Function which implements the guarded quantification condition.
+        aggregation_vars: :obj:`list`
+            List of labels of the variables on which the quantification has to be performed.
+
+        Returns
+        ----------
+        (:class:`LTNObject`, :class:`LTNObject`)
+            Tuple where the first element is the input formula transposed in such a way that the
+            guarded variables are in the first dimensions, while the second element is the mask that has to be applied over
+            the formula in order to perform the guarded quantification. The formula and the mask will have the same shape in
+            order to apply the mask to the formula by element-wise operations.
+        """
+        # reshape the formula in such a way it now includes the dimensions related to the variables in the condition
+        # this has to be done only if the formula does not include some variables in the condition yet
+        cond_vars_not_in_formula = [var for var in cond_vars if var.free_vars[0] not in formula.free_vars]
+        if cond_vars_not_in_formula:
+            proc_objs, _, n_ind = process_ltn_objects([formula] + cond_vars_not_in_formula)
+            formula = proc_objs[0]
+            formula.value = formula.value.view(tuple(n_ind))
+
+        # set the masked (guarded) vars on the first axes
+        vars_in_cond_labels = [var.free_vars[0] for var in cond_vars]
+        vars_in_cond_not_agg_labels = [var for var in vars_in_cond_labels if var not in aggregation_vars]
+        vars_in_cond_agg_labels = [var for var in vars_in_cond_labels if var in aggregation_vars]
+        vars_not_in_cond_labels = [var for var in formula.free_vars if var not in vars_in_cond_labels]
+        formula_new_vars_order = vars_in_cond_not_agg_labels + vars_in_cond_agg_labels + vars_not_in_cond_labels
+
+        # we need to construct a dict to remove duplicate diag entries inside the labels
+        # these duplicates would interfere with the transposition operation
+        formula = Quantifier.transpose_vars(formula, list(dict.fromkeys(formula_new_vars_order)))
+
+        # compute the boolean mask using the variables in the condition
+        # make the shapes of the variables in the condition compatible in order to apply the condition element-wisely
+        cond_vars, vars_order_in_cond, n_individuals_per_var = process_ltn_objects(cond_vars)
+        mask = cond_fn(*cond_vars)  # creates the mask
+        # give the mask the correct shape after the condition has been computed
+        mask = torch.reshape(mask, tuple(n_individuals_per_var))
+
+        # transpose the mask dimensions according to the var order in formula_grounding
+        # create LTN object for the mask with associated free variables
+        mask = LTNObject(mask, vars_order_in_cond)
+
+        cond_new_vars_order = vars_in_cond_not_agg_labels + vars_in_cond_agg_labels
+
+        # we need to construct a dict to remove duplicate diag entries inside the labels
+        # these duplicates would interfere with the transposition operation
+        mask = Quantifier.transpose_vars(mask, list(dict.fromkeys(cond_new_vars_order)))
+
+        # make formula and mask of the same shape in order to apply the mask element-wisely
+        if formula.shape() != mask.shape():
+            # I have to rearrange the size of the mask if it has a different size respect to the formula
+            # this is needed to apply an element-wise torch.where in order to apply the mask
+            (formula, mask), vars, n_individuals_per_var = process_ltn_objects([formula, mask])
+            mask.value = mask.value.view(n_individuals_per_var)
+            # this fix the side effect due to call to process_ltn_objects
+            formula.value = formula.value.view(n_individuals_per_var)
+
+        return formula, mask
+
+    @staticmethod
+    def transpose_vars(object, new_vars_order):
+        """
+        It transposes the input LTN object using the order of variables given in `new_vars_order` parameter.
+
+        Parameters
+        ----------
+        object: :class:`LTNObject`
+            LTN object that has to be transposed.
+        new_vars_order: :obj:`list`
+            List containing the order of variables (expressed by labels) to transpose the input object.
+
+        Returns
+        -----------
+        :class:`LTNObject`
+            The input LTN object transposed according to the order in `new_vars_order` parameter.
+        """
+        perm = [object.free_vars.index(var) for var in new_vars_order]
+        object.value = torch.permute(object.value, perm)
+        object.free_vars = new_vars_order
+        return object

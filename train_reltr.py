@@ -26,6 +26,7 @@ from coco import build_dataset, get_coco_api_from_dataset
 from engine import evaluate, train_one_epoch
 from models import build_model
 
+import pdb
 
 # setup var to cuda crash
 #os.environ['PYTORCH_CUDA_ALLOC_CONF']='max_split_size_mb:1024'
@@ -52,7 +53,6 @@ def main(args):
     device =  torch.device(args.device)
 
 
-
     if args.reproduce:
         torch.manual_seed(args.seed)
         np.random.seed(args.numpy_seed)
@@ -60,7 +60,7 @@ def main(args):
 
     print(f'numpy_seed:{args.numpy_seed}|seed:{args.seed}')
 
-    reltr_model, criterion, postprocessors = build_model(args)
+    reltr_model, criterion, postprocessors = build_model(args, use_log=True)
     
 
        

@@ -302,9 +302,9 @@ def grounding(sub_bbox:torch.Tensor,  obj_bbox:torch.Tensor, sub_logits:torch.Te
         else:
             raise ValueError('Invalid strategy')
 
-        gr_sub_bbox = ltn.Variable(f'gr_sub_box', tensor_sub_bbox)
-        gr_obj_bbox = ltn.Variable(f'gr_obj_box', tensor_obj_bbox)
-                    
+        gr_sub_bbox = ltn_log.Variable(f'gr_sub_box', tensor_sub_bbox)
+        gr_obj_bbox = ltn_log.Variable(f'gr_obj_box', tensor_obj_bbox)
+
         gr_rel_bbox = None
         mask_idx = None
         constr_item = None
@@ -365,8 +365,8 @@ def grounding(sub_bbox:torch.Tensor,  obj_bbox:torch.Tensor, sub_logits:torch.Te
                 assert torch.sum(constr_item[0][0] - constr_item[0][-1]).item() == 0, 'tensor-0 is not  correctly repeated'
                 assert torch.sum(constr_item[1][0] - constr_item[1][-1]).item() == 0, 'tensor-1 is not  correctly repeated'
                 
-
-            gr_rel_bbox = ltn.Variable(f'gr_rel_box', tensor_gr_rel)
+            
+            gr_rel_bbox = ltn_log.Variable(f'gr_rel_box', tensor_gr_rel)
             
    
         

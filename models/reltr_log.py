@@ -19,7 +19,7 @@ from .backbone import build_backbone
 from .matcher import build_matcher
 from .transformer import build_transformer
 from .kge import build_kge
-from .fuzzy_logic import *
+from .fuzzy_logic_log import *
 import ltn_log
 
 from utils.dataset import MAP_PD2TG
@@ -349,58 +349,51 @@ class SetCriterion(nn.Module):
 
             if different_p == None:
                 self.equal_p = True
-                self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
-                self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
+                self.forall_neg = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(), quantifier='f')
+                self.forall_pos = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(), quantifier='f')
 
                 # for simplicity same forall for entity and relationship
-                self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=univ_p), quantifier="f")
+                self.forall_ent_o_rel = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(),
+                                                                       quantifier='f')
 
             else:
                 self.equal_p = False
-                self.forall_neg = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
-                self.forall_pos = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[0]), quantifier="f")
-                self.forall_hard = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[1]), quantifier="f")
+                self.forall_neg = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(),
+                                                                 quantifier='f')
+                self.forall_pos = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(),
+                                                                 quantifier='f')
+                self.forall_hard = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(),
+                                                                  quantifier='f')
 
-                self.forall_ent_o_rel = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=different_p[-1]),
-                                                       quantifier="f")
+                self.forall_ent_o_rel = ltn_log.Quantifier(ltn_log.fuzzy_ops.AggregMean(),
+                                                                       quantifier='f')
 
                 self.rel_cls_easy = self._parse_type_constraint(rel_easy_axiom_path, device=device)
                 self.rel_cls_hard = self._parse_type_constraint(rel_hard_axiom_path, device=device)
 
-            self.c_not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
-            self.and_luk = ltn.Connective(ltn.fuzzy_ops.AndLuk())
+            self.c_not = ltn_log.Connective(ltn_log.fuzzy_ops.Not_log_negation_softmax())
+            self.and_luk = ltn_log.Connective(ltn_log.fuzzy_ops.And_Sum())
 
             self.ltn_strategy = ltn_strategy
 
-            match rel_operator:
-                case 0:
-                    self.rel_operator = ltn.Connective(ltn.fuzzy_ops.AndLuk())
-
-                case 1:
-                    self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesReichenbach())
-
-                case 2:
-                    self.rel_operator = ltn.Connective(ltn.fuzzy_ops.ImpliesGodel())
-
-                case _:
-                    raise ValueError(f'rel_operator {rel_operator} is invalid')
+            self.rel_operator = ltn_log.Connective(ltn_log.fuzzy_ops.And_Sum())
 
             match self.ltn_strategy:
                 case 0:
                     # just use the embeeding class output of the network
-                    self.p_sub_is_a = ltn.Predicate(model=PredFromEmbedding())
+                    self.p_sub_is_a = ltn_log.core.Predicate(model=PredFromEmbedding())
 
-                    self.p_obj_is_a = ltn.Predicate(model=PredFromEmbedding())
-                    self.p_sub_in_set = ltn.Predicate(model=EntInSet())
-                    self.p_obj_in_set = ltn.Predicate(model=EntInSet())
+                    self.p_obj_is_a = ltn_log.core.Predicate(model=PredFromEmbedding())
+                    self.p_sub_in_set = ltn_log.core.Predicate(model=EntInSet())
+                    self.p_obj_in_set = ltn_log.core.Predicate(model=EntInSet())
 
                     gr_last_dim = self.num_classes * 2 + 7 + (self.num_rel_classes + 1)
 
                 case 1:
                     self.ground_entity = GroundVanilla(layer_sizes=(self.num_classes + 4 + 1, 64, self.num_classes))
 
-                    self.p_sub_is_a = ltn.Predicate(model=GroundPred(self.ground_entity))
-                    self.p_obj_is_a = ltn.Predicate(model=GroundPred(self.ground_entity))
+                    self.p_sub_is_a = ltn_log.core.Predicate(model=GroundPred(self.ground_entity))
+                    self.p_obj_is_a = ltn_log.core.Predicate(model=GroundPred(self.ground_entity))
                     gr_last_dim = (self.num_classes + 4 + 1) * 2 + 7 + (self.num_rel_classes + 1)
                 case _:
                     raise ValueError(f'ltn strategy {ltn_strategy} is invalid')
@@ -416,37 +409,37 @@ class SetCriterion(nn.Module):
                         layer_sizes=(gr_last_dim, 64, 128, self.num_rel_classes), p_dropout=p_dropout)
 
                 self.use_regressor = True
-                self.p_rel_in_set = ltn.Predicate(model=RelInSetL(self.ground_relationship))
-                self.p_rel_is_a = ltn.Predicate(model=RelIsAL(self.ground_relationship))
+                self.p_rel_in_set = ltn_log.core.Predicate(model=RelInSetL(self.ground_relationship))
+                self.p_rel_is_a = ltn_log.core.Predicate(model=RelIsAL(self.ground_relationship))
 
             else:
                 self.ground_relationship = None
                 self.use_regressor = False
 
-                self.p_rel_in_set = ltn.Predicate(model=RelInSetL(use_logit=False))
-                self.p_rel_is_a = ltn.Predicate(model=RelIsAL(use_logit=False))
+                self.p_rel_in_set = ltn_log.core.Predicate(model=RelInSetL(use_logit=False))
+                self.p_rel_is_a = ltn_log.core.Predicate(model=RelIsAL(use_logit=False))
 
 
-            self.sat_aggr = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+            self.sat_aggr = ltn_log.fuzzy_ops.SatAgg(ltn_log.fuzzy_ops.Aggreg_Sum())
 
             # satisfiability for debugging purpose
-            self.sat_ent_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_rel_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_neg_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
-            self.sat_pos_axiom = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError(p=aggr_p))
+            self.sat_ent_axiom = ltn_log.fuzzy_ops.SatAgg(ltn_log.fuzzy_ops.Aggreg_Sum())
+            self.sat_rel_axiom = ltn_log.fuzzy_ops.SatAgg(ltn_log.fuzzy_ops.Aggreg_Sum())
+            self.sat_neg_axiom = ltn_log.fuzzy_ops.SatAgg(ltn_log.fuzzy_ops.Aggreg_Sum())
+            self.sat_pos_axiom = ltn_log.fuzzy_ops.SatAgg(ltn_log.fuzzy_ops.Aggreg_Sum())
             # float conversion is enough for fuzzification: account also for traffic label taxonomy
-            self.ot_e_label = [ltn.Constant(t.t().float()) for t in
+            self.ot_e_label = [ltn_log.Constant(t.t().float()) for t in
                                torch.split(F.one_hot(torch.arange(0, self.num_classes), self.num_classes), 1)]
             # define constraint relationship here
             # impl one-hot enconding for constraints
-            self.ot_r_label = [ltn.Constant(t.t().float()) for t in
+            self.ot_r_label = [ltn_log.Constant(t.t().float()) for t in
                                torch.split(F.one_hot(torch.arange(0, self.num_rel_classes), self.num_rel_classes),
                                            1)]
             self.entity_fuzzy_th = entity_fuzzy_th
 
             self.all_label_type = {}
 
-            self.not_op = ltn.Connective(ltn.fuzzy_ops.NotStandard())
+            self.not_op = ltn_log.Connective((ltn_log.fuzzy_ops.Not_log_negation_softmax()))
 
             if use_snc == True:
                 print('USING Second Negative Constraints formulation ')
@@ -462,9 +455,7 @@ class SetCriterion(nn.Module):
                 self.pos_indices = (2, 3)
 
                 self.rel_neg_const_map = self._parse_r4so_constraint(neg_constr_path, self.neg_indices)
-                self.or_luk = ltn.Connective(ltn.fuzzy_ops.OrLuk())
-
-
+                self.or_luk = ltn_log.Connective(ltn_log.fuzzy_ops.OR_LogMeanExp())
 
             self.rel_pos_const_map =  self._parse_r4so_constraint(pos_constr_path, self.pos_indices)
                 
@@ -1254,22 +1245,14 @@ class SetCriterion(nn.Module):
         gr_sub, gr_obj, _, _ , _ = grounding(sub_boxes, obj_boxes,
                                             sub_logits, obj_logits,
                                             self.ltn_strategy, use_log)
-        if not use_log:
-            cls_s = ltn.Variable(f'cls_s', torch.hstack([self.ot_e_label[cls].value for cls in sub_valid_cls]).t() )
-            cls_o = ltn.Variable(f'cls_o', torch.hstack([self.ot_e_label[cls].value for cls in obj_valid_cls]).t() )
 
-            axiom_entity = self.forall_ent_o_rel(
-                ltn.diag(gr_sub, cls_s, gr_obj, cls_o),
-                self.and_luk(self.p_sub_is_a(gr_sub, cls_s), self.p_obj_is_a(gr_obj, cls_o))
-            )
-        else:
-            cls_s = ltn_log.Variable(f'cls_s', torch.hstack([self.ot_e_label[cls].value for cls in sub_valid_cls]).t())
-            cls_o = ltn_log.Variable(f'cls_o', torch.hstack([self.ot_e_label[cls].value for cls in obj_valid_cls]).t())
+        cls_s = ltn_log.Variable(f'cls_s', torch.hstack([self.ot_e_label[cls].value for cls in sub_valid_cls]).t())
+        cls_o = ltn_log.Variable(f'cls_o', torch.hstack([self.ot_e_label[cls].value for cls in obj_valid_cls]).t())
 
-            axiom_entity = self.forall_ent_o_rel(
-                ltn_log.diag(gr_sub, cls_s, gr_obj, cls_o),
-                self.and_luk(self.p_sub_is_a(gr_sub, cls_s), self.p_obj_is_a(gr_obj, cls_o))
-            )
+        axiom_entity = self.forall_ent_o_rel(
+            ltn_log.diag(gr_sub, cls_s, gr_obj, cls_o),
+            self.and_luk(self.p_sub_is_a(gr_sub, cls_s), self.p_obj_is_a(gr_obj, cls_o))
+        )
 
         return axiom_entity
     
@@ -1278,43 +1261,24 @@ class SetCriterion(nn.Module):
         """
         evaluated relationships satisfiability wrt to ground-truth
         """
-        if not use_log:
-            gr_rel = ltn.Variable(f'gr_rel_box', rel_logits[:, :-1])
-            try:
-                cls_r = ltn.Variable(f'cls_r', torch.hstack([self.ot_r_label[cls].value for cls in  rel_gt_cls ]).t() )
 
-                axiom_rel = self.forall_ent_o_rel(
-                                    ltn.diag( gr_rel, cls_r),
-                                    self.p_rel_is_a(gr_rel, cls_r)
-                                    )
-            except Exception as e:
-                print(f'EXCEPTION:{e}')
+        gr_rel = ltn_log.Variable(f'gr_rel_box', rel_logits[:, :-1])
+        try:
+            cls_r = ltn_log.Variable(f'cls_r', torch.hstack([self.ot_r_label[cls].value for cls in rel_gt_cls]).t())
 
-                print(f'rel_gt_cls:{rel_gt_cls}')
+            axiom_rel = self.forall_ent_o_rel(
+                ltn_log.diag(gr_rel, cls_r),
+                self.p_rel_is_a(gr_rel, cls_r)
+            )
+        except Exception as e:
+            print(f'EXCEPTION:{e}')
 
-                print(f'pytorch seed:{torch.get_rng_state()}')
-                print(f'numpy seed:{np.random.get_state()}')
-                print(f'random seed:{random.getstate()}')
-                raise e
+            print(f'rel_gt_cls:{rel_gt_cls}')
 
-        else:
-            gr_rel = ltn_log.Variable(f'gr_rel_box', rel_logits[:, :-1])
-            try:
-                cls_r = ltn_log.Variable(f'cls_r', torch.hstack([self.ot_r_label[cls].value for cls in rel_gt_cls]).t())
-
-                axiom_rel = self.forall_ent_o_rel(
-                    ltn_log.diag(gr_rel, cls_r),
-                    self.p_rel_is_a(gr_rel, cls_r)
-                )
-            except Exception as e:
-                print(f'EXCEPTION:{e}')
-
-                print(f'rel_gt_cls:{rel_gt_cls}')
-
-                print(f'pytorch seed:{torch.get_rng_state()}')
-                print(f'numpy seed:{np.random.get_state()}')
-                print(f'random seed:{random.getstate()}')
-                raise e
+            print(f'pytorch seed:{torch.get_rng_state()}')
+            print(f'numpy seed:{np.random.get_state()}')
+            print(f'random seed:{random.getstate()}')
+            raise e
 
 
         return axiom_rel
@@ -1355,21 +1319,23 @@ class SetCriterion(nn.Module):
             
         assert mask_idx_tensor is not None, f'mask_idx_tensor cannot be None'
 
-        cls_s = ltn.Variable(f'cls_s', cls_s_tensor)
-        cls_o = ltn.Variable(f'cls_o', cls_o_tensor)
-        cls_r = ltn.Variable(f'cls_r', cls_r_tensor)
 
-        mask_idx   = ltn.Variable(f'mask_id', mask_idx_tensor)
-        neg_constr = ltn.Variable(f'neg_constr', constr_tensor)
+        cls_s = ltn_log.Variable(f'cls_s', cls_s_tensor)
+        cls_o = ltn_log.Variable(f'cls_o', cls_o_tensor)
+        cls_r = ltn_log.Variable(f'cls_r', cls_r_tensor)
 
+        mask_idx = ltn_log.Variable(f'mask_id', mask_idx_tensor)
+        neg_constr = ltn_log.Variable(f'neg_constr', constr_tensor)
 
-        axiom_fuzzy = self.forall_neg( ltn.diag( gr_sub, cls_s, gr_obj, cls_o, gr_rel, cls_r,  mask_idx, neg_constr),
-                            self.rel_operator(
-                                self.and_luk( self.p_sub_is_a(gr_sub, cls_s), self.p_obj_is_a(gr_obj, cls_o) ),
-                                self.not_op(self.p_rel_in_set(gr_rel, mask_idx, neg_constr, training=True))
+        axiom_fuzzy = self.forall_neg(ltn_log.diag(gr_sub, cls_s, gr_obj, cls_o, gr_rel, cls_r, mask_idx, neg_constr),
+                                      self.rel_operator(
+                                          self.and_luk(self.p_sub_is_a(gr_sub, cls_s),
+                                                       self.p_obj_is_a(gr_obj, cls_o)),
+                                          self.not_op(
+                                              self.p_rel_in_set(gr_rel, mask_idx, neg_constr, training=True))
 
-                            )
-                    )
+                                      )
+                                      )
 
 
         return axiom_fuzzy 
@@ -1413,39 +1379,36 @@ class SetCriterion(nn.Module):
         assert mask_idx_tensor is not None, f'mask_idx_tensor cannot be None'
 
 
-        cls_r = ltn.Variable(f'cls_r', cls_r_tensor)
+        cls_r = ltn_log.Variable(f'cls_r', cls_r_tensor)
 
-        mask_idx_s   = ltn.Variable(f'mask_id', mask_idx_tensor[0])
-        pos_constr_s = ltn.Variable(f'pos_constr', pos_contr_tensor[0])
-        mask_idx_o   = ltn.Variable(f'mask_id', mask_idx_tensor[1])
-        pos_constr_o = ltn.Variable(f'pos_constr', pos_contr_tensor[1])
+        mask_idx_s = ltn_log.Variable(f'mask_id', mask_idx_tensor[0])
+        pos_constr_s = ltn_log.Variable(f'pos_constr', pos_contr_tensor[0])
+        mask_idx_o = ltn_log.Variable(f'mask_id', mask_idx_tensor[1])
+        pos_constr_o = ltn_log.Variable(f'pos_constr', pos_contr_tensor[1])
 
         #
-        if forall_type==0:
-            axiom_fuzzy = self.forall_pos( ltn.diag( gr_sub, gr_obj, gr_rel, cls_r,
-                                            mask_idx_s, pos_constr_s, mask_idx_o, pos_constr_o),
-                            self.rel_operator(
-                                self.p_rel_is_a(gr_rel, cls_r ),
-                                self.and_luk( self.p_sub_in_set(gr_sub, mask_idx_s, pos_constr_s),
-                                             self.p_obj_in_set(gr_obj, mask_idx_o, pos_constr_o ) )
+        if forall_type == 0:
+            axiom_fuzzy = self.forall_pos(ltn_log.diag(gr_sub, gr_obj, gr_rel, cls_r,
+                                                   mask_idx_s, pos_constr_s, mask_idx_o, pos_constr_o),
+                                          self.rel_operator(
+                                              self.p_rel_is_a(gr_rel, cls_r),
+                                              self.and_luk(self.p_sub_in_set(gr_sub, mask_idx_s, pos_constr_s),
+                                                           self.p_obj_in_set(gr_obj, mask_idx_o, pos_constr_o))
 
+                                          )
+                                          )
+        elif forall_type == 1:
+            axiom_fuzzy = self.forall_hard(ltn_log.diag(gr_sub, gr_obj, gr_rel, cls_r,
+                                                    mask_idx_s, pos_constr_s, mask_idx_o, pos_constr_o),
+                                           self.rel_operator(
+                                               self.p_rel_is_a(gr_rel, cls_r),
+                                               self.and_luk(self.p_sub_in_set(gr_sub, mask_idx_s, pos_constr_s),
+                                                            self.p_obj_in_set(gr_obj, mask_idx_o, pos_constr_o))
 
-                            )
-                    )
-        elif forall_type==1:
-            axiom_fuzzy = self.forall_hard( ltn.diag( gr_sub, gr_obj, gr_rel, cls_r,
-                                            mask_idx_s, pos_constr_s, mask_idx_o, pos_constr_o),
-                            self.rel_operator(
-                                self.p_rel_is_a(gr_rel, cls_r ),
-                                self.and_luk( self.p_sub_in_set(gr_sub, mask_idx_s, pos_constr_s),
-                                             self.p_obj_in_set(gr_obj, mask_idx_o, pos_constr_o ) )
-
-
-                            )
-                    )
+                                           )
+                                           )
         else:
             raise ValueError(f'Invalid for_all type={forall_type}: it must be in [0,1]')
-
 
 
         return axiom_fuzzy
@@ -1488,40 +1451,41 @@ class SetCriterion(nn.Module):
         assert mask_idx_tensor is not None, f'mask_idx_tensor cannot be None'
 
 
-        cls_r = ltn.Variable(f'cls_r', cls_r_tensor)
 
-        mask_idx_s   = ltn.Variable(f'mask_id', mask_idx_tensor[0])
-        neg_constr_s = ltn.Variable(f'neg_constr', neg_contr_tensor[0])
-        mask_idx_o   = ltn.Variable(f'mask_id', mask_idx_tensor[1])
-        neg_constr_o = ltn.Variable(f'neg_constr', neg_contr_tensor[1])
+        cls_r = ltn_log.Variable(f'cls_r', cls_r_tensor)
 
-        if forall_type==0:
-            axiom_fuzzy = self.forall_neg( ltn.diag( gr_sub, gr_obj, gr_rel, cls_r,
-                                                mask_idx_s, neg_constr_s, mask_idx_o, neg_constr_o),
-                                self.rel_operator(
-                                    self.p_rel_is_a(gr_rel, cls_r ),
-                                    self.and_luk( self.not_op( self.p_sub_in_set(gr_sub, mask_idx_s, neg_constr_s) ),
-                                                self.not_op( self.p_obj_in_set(gr_obj, mask_idx_o, neg_constr_o ) )
-                                    )
+        mask_idx_s = ltn_log.Variable(f'mask_id', mask_idx_tensor[0])
+        neg_constr_s = ltn_log.Variable(f'neg_constr', neg_contr_tensor[0])
+        mask_idx_o = ltn_log.Variable(f'mask_id', mask_idx_tensor[1])
+        neg_constr_o = ltn_log.Variable(f'neg_constr', neg_contr_tensor[1])
 
-                                )
-                        )
+        if forall_type == 0:
+            axiom_fuzzy = self.forall_neg(ltn_log.diag(gr_sub, gr_obj, gr_rel, cls_r,
+                                                   mask_idx_s, neg_constr_s, mask_idx_o, neg_constr_o),
+                                          self.rel_operator(
+                                              self.p_rel_is_a(gr_rel, cls_r),
+                                              self.and_luk(
+                                                  self.not_op(self.p_sub_in_set(gr_sub, mask_idx_s, neg_constr_s)),
+                                                  self.not_op(self.p_obj_in_set(gr_obj, mask_idx_o, neg_constr_o))
+                                                  )
 
-        elif forall_type==1:
-            axiom_fuzzy = self.forall_hard( ltn.diag( gr_sub, gr_obj, gr_rel, cls_r,
-                                        mask_idx_s, neg_constr_s, mask_idx_o, neg_constr_o),
-                        self.rel_operator(
-                            self.p_rel_is_a(gr_rel, cls_r ),
-                            self.and_luk( self.not_op( self.p_sub_in_set(gr_sub, mask_idx_s, neg_constr_s) ),
-                                        self.not_op( self.p_obj_in_set(gr_obj, mask_idx_o, neg_constr_o ) )
-                            )
+                                          )
+                                          )
 
-                        )
-                )
+        elif forall_type == 1:
+            axiom_fuzzy = self.forall_hard(ltn_log.diag(gr_sub, gr_obj, gr_rel, cls_r,
+                                                    mask_idx_s, neg_constr_s, mask_idx_o, neg_constr_o),
+                                           self.rel_operator(
+                                               self.p_rel_is_a(gr_rel, cls_r),
+                                               self.and_luk(
+                                                   self.not_op(self.p_sub_in_set(gr_sub, mask_idx_s, neg_constr_s)),
+                                                   self.not_op(self.p_obj_in_set(gr_obj, mask_idx_o, neg_constr_o))
+                                                   )
+
+                                           )
+                                           )
         else:
             raise ValueError(f'Invalid for_all type={forall_type}: it must be in [0,2]')
-
-
 
         return axiom_fuzzy
 
@@ -1785,7 +1749,7 @@ class PostProcess(nn.Module):
 
 
 
-def build(args):
+def build_log(args):
 
     # add background class for vg compatibility, whihc is added in reltr architecture
     # since all imgs have either relationship or class
